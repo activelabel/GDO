@@ -160,4 +160,5 @@ full_view_df = filtered[[
 
 full_view_df.columns = [
     "Shipment ID", "Timestamp", "Operator", "Device",
-    "Temperature (°C)", "Min Temp", "Max Temp
+    "Temperature (°C)", "Min Temp", "Max Temp", "Exposure", "City"
+]
