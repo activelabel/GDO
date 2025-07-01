@@ -80,23 +80,12 @@ else:
         default=list(data["operator"].unique())
     )
 
-# Location Info filter
-if st.sidebar.checkbox("Select all Locations", value=True):
-    sel_loc = list(data["Location Info"].unique())
-else:
-    sel_loc = st.sidebar.multiselect(
-        "Location Info",
-        options=data["Location Info"].unique(),
-        default=list(data["Location Info"].unique())
-    )
-
 # Apply filters
 filtered = data[
     (data["Market Label"].isin(sel_label)) &
     (data["reading_timestamp"].dt.date.between(date_range[0], date_range[1])) &
     (data["product"].isin(sel_prod)) &
-    (data["operator"].isin(sel_op)) &
-    (data["Location Info"].isin(sel_loc))
+    (data["operator"].isin(sel_op))
 ]
 
 # ------------------------------------------------
@@ -146,12 +135,12 @@ st.markdown("_Filtered shipments list._")
 cols = [
     "shipment_id","reading_timestamp","operator","product",
     "actual_temperature","threshold_min_temperature","threshold_max_temperature",
-    "in_range","out_of_range","shipment_cost_eur","unit_co2_emitted","Market Label","Location Info"
+    "in_range","out_of_range","shipment_cost_eur","unit_co2_emitted","Market Label"
 ]
 all_ship = filtered[cols].copy()
 all_ship.columns = [
     "Shipment ID","Timestamp","Operator","Product",
     "Actual Temp (°C)","Min Temp","Max Temp",
-    "In Range","Out of Range","Cost (€)","CO₂ Emitted (kg)","Market Label","Location"
+    "In Range","Out of Range","Cost (€)","CO₂ Emitted (kg)","Market Label"
 ]
 st.dataframe(all_ship.sort_values("Timestamp", ascending=False), use_container_width=True)
