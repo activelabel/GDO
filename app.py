@@ -153,41 +153,7 @@ else:
         column_config={"Select": st.column_config.CheckboxColumn(required=True)},
         key="alert_selector"
     )
-# ------------------------------------------------
-# ALL FILTERED SHIPMENTS TABLE (nuova sezione)
-# ------------------------------------------------
-st.subheader("📋 All Shipments")
-st.markdown("_Filtered results, including both in-range and out-of-range shipments._")
-
-# Tabella semplificata dei dati filtrati
-full_view_df = filtered[[
-    "shipment_id",
-    "reading_timestamp",
-    "operator",
-    product_col = "product" if "product" in filtered.columns else "device"uo file
-    "actual_temperature",
-    "threshold_min_temperature",
-    "threshold_max_temperature",
-    "in_range" if "in_range" in filtered.columns else "exposure",  # fallback
-    "city"
-]].copy()
-
-# Rinomina colonne per chiarezza
-full_view_df.columns = [
-    "Shipment ID",
-    "Timestamp",
-    "Operator",
-    "Product",
-    "Temperature (°C)",
-    "Min Temp",
-    "Max Temp",
-    "In Range" if "in_range" in filtered.columns else "Exposure",
-    "City"
-]
-
-# Mostra tabella
-st.dataframe(full_view_df.sort_values("Timestamp", ascending=False), use_container_width=True)
-
+# 
 # ------------------------------------------------
 # SELECTED ALERTS (dettagli shipment sotto la tabella)
 # ------------------------------------------------
