@@ -33,23 +33,12 @@ with col2:
 # ------------------------------------------------
 @st.cache_data
 def load_data(path: str):
-    columns = [
-        'operator', 'device', 'reading_timestamp', 'exposure', 'actual_temperature',
-        'threshold_min_temperature', 'threshold_max_temperature', 'shipment_id',
-        'shipment_datetime', 'latitude', 'longitude'
-    ]
+    return pd.read_csv(path, parse_dates=["reading_timestamp"])
 
-    df = pd.read_csv(
-        path,
-        sep='\s+',
-        header=None,
-        names=columns,
-        parse_dates=["reading_timestamp", "shipment_datetime"],
-        dayfirst=True
-    )
-    return df
+data = load_data("italian_shipments_dataset.csv")
 
-data = load_data("Dati_Lettura.txt")
+
+# FILTERS (with select-all option)
 
 
 
