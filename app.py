@@ -186,42 +186,58 @@ full.columns = [
 st.dataframe(full.sort_values("Timestamp",ascending=False), use_container_width=True)
 
 # ------------------------------------------------
-# 🗺️ MAP VIEW
+# 🗺️ MAP VIEW AND SHIPMENTS SIDE-BY-SIDE
 # ------------------------------------------------
-st.subheader("🗺️ Map of Markets and Shipments")
-# Market centers (blue)
-market_centers = filtered.groupby('market').agg({'latitude':'mean','longitude':'mean'}).reset_index()
-# Shipment points colored by status
-filtered['status_color'] = filtered['in_range'].map({True:'green', False:'red'})
+st.subheader("📋 All Shipments & Map")
+left_col, right_col = st.columns((2, 3))
 
-fig = go.Figure()
-# Add market centers
-fig.add_trace(go.Scattermapbox(
-    lat=market_centers['latitude'],
-    lon=market_centers['longitude'],
-    mode='markers+text',
-    marker=dict(size=15, color='blue'),
-    text=market_centers['market'],
-    textposition='top right',
-    name='Market'
-))
-# Add shipments
-fig.add_trace(go.Scattermapbox(
-    lat=filtered['latitude'],
-    lon=filtered['longitude'],
-    mode='markers',
-    marker=dict(size=8, color=filtered['status_color']),
-    hovertext=filtered['shipment_id'],
-    name='Shipments'
-))
-fig.update_layout(
-    mapbox_style='open-street-map',
-    mapbox_zoom=5,
-    mapbox_center={
-        'lat': filtered['latitude'].mean(),
-        'lon': filtered['longitude'].mean()
-    },
-    height=600,
-    margin=dict(l=0,r=0,t=0,b=0)
-)
-st.plotly_chart(fig, use_container_width=True)
+with left_col:
+    st.markdown("_Filtered results, including both in-range and out-of-range shipments._")
+    full = filtered[[
+        "shipment_id","reading_timestamp","operator","product",
+        "actual_temperature","threshold_min_temperature","threshold_max_temperature",
+        "in_range","out_of_range","shipment_cost_eur","unit_co2_emitted","location_info"
+    ]].copy()
+    full.columns = [
+        "Shipment ID","Timestamp","Operator","Product",
+        "Actual Temp (°C)","Min Temp","Max Temp",
+        "In Range","Out of Range","Cost (€)","CO2 Emitted (kg)","Location"
+    ]
+    st.dataframe(full.sort_values("Timestamp",ascending=False), use_container_width=True)
+
+with right_col:
+    st.markdown("_Geographical view of shipments status by location._")
+    # Market centers (blue)
+    market_centers = filtered.groupby('market').agg({'latitude':'mean','longitude':'mean'}).reset_index()
+    # Shipment points colored by status
+    filtered['status_color'] = filtered['in_range'].map({True:'green', False:'red'})
+
+    fig = go.Figure()
+    # Add market centers
+    fig.add_trace(go.Scattermapbox(
+        lat=market_centers['latitude'],
+        lon=market_centers['longitude'],
+        mode='markers+text',
+        marker=dict(size=15, color='blue'),
+        text=market_centers['market'],
+        textposition='top right',
+        name='Market'
+    ))
+    # Add shipments
+    fig.add_trace(go.Scattermapbox(
+        lat=filtered['latitude'],
+        lon=filtered['longitude'],
+        mode='markers',
+        marker=dict(size=8, color=filtered['status_color']),
+        hovertext=filtered['shipment_id'],
+        name='Shipments'
+    ))
+    fig.update_layout(
+        mapbox_style='open-street-map',
+        mapbox_zoom=5,
+        mapbox_center={
+            'lat': filtered['latitude'].mean(),
+            'lon': filtered['longitude'].mean()
+        },
+        height=600,
+        margin=dict(l=0,
