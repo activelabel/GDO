@@ -4,7 +4,7 @@
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 
-@st.cache_resource(show_spinner=False)
+@st.experimental_singleton
 def get_reverse_geocoder():
     geolocator = Nominatim(user_agent="active_label_app")
     return RateLimiter(geolocator.reverse, min_delay_seconds=1)
