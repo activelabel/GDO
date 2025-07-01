@@ -11,7 +11,7 @@ reverse = RateLimiter(geolocator.reverse, min_delay_seconds=1)
 # ------------------------------------------------
 # DATA LOADING
 # ------------------------------------------------
-@st.cache_data
+@st.cache
 def load_data(path: str, market_city: str) -> pd.DataFrame:
     df = pd.read_csv(
         path,
@@ -21,10 +21,23 @@ def load_data(path: str, market_city: str) -> pd.DataFrame:
     # annotate market city
     df['Market City'] = market_city
     # reverse-geocode Comune for each coordinate
-    df['Comune'] = df.apply(lambda row: reverse_geocode(row['latitude'], row['longitude']), axis=1)
+    def get_comune(row):
+        try:
+            loc = reverse((row['latitude'], row['longitude']), language='en')
+            addr = loc.raw.get('address', {})
+            for key in ('municipality','city','town','village'):
+                if key in addr:
+                    return addr[key]
+        except:
+            pass
+        return 'Unknown'
+    df['Comune'] = df.apply(get_comune, axis=1)
     # store location info string
-    df['Location Info'] = df['latitude'].astype(str) + ", " + df['longitude'].astype(str) + f" - {market_city}"
+    df['Location Info'] = (
+        df['latitude'].astype(str) + ", " + df['longitude'].astype(str) + f" - {market_city}"
+    )
     return df
+
 
 # ------------------------------------------------
 # MARKET SELECTION
