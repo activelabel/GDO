@@ -166,11 +166,12 @@ else:
 # ------------------------------------------------
 st.subheader("📋 All Shipments")
 st.markdown("_Filtered results, including both in-range and out-of-range shipments._")
-full = filtered[[
+full_cols = [
     "shipment_id","reading_timestamp","operator","product",
     "actual_temperature","threshold_min_temperature","threshold_max_temperature",
     "in_range","out_of_range","shipment_cost_eur","unit_co2_emitted","location_info"
-]].copy()
+]
+full = filtered[full_cols].copy()
 full.columns = [
     "Shipment ID","Timestamp","Operator","Product",
     "Actual Temp (°C)","Min Temp","Max Temp",
