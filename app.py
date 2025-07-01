@@ -29,7 +29,7 @@ with col2:
     st.title("Active Label GDO_2")
 
 # ------------------------------------------------
-# DATA
+# DATA LOADING
 # ------------------------------------------------
 @st.cache_data
 def load_data(path: str) -> pd.DataFrame:
@@ -38,28 +38,33 @@ def load_data(path: str) -> pd.DataFrame:
         parse_dates=["reading_timestamp"],
         dayfirst=True
     )
-    df["city"] = df["city"].astype(str)
-    # annotate source file
+    # city column already set in file
+    # annotate source (city) from filename
     df["market"] = Path(path).stem
     return df
 
-# Sidebar: select market datasets
-st.sidebar.header("Market Selection")
+# Sidebar: select markets by city name
+st.sidebar.header("Market Selection by City")
 market_options = {
-    "Market 1": "Market_1_shipments_dataset.csv",
+    "Florence": "Market_1_shipments_dataset.csv",
     "Rome": "Market_2_shipments_dataset.csv"
 }
 selected_markets = st.sidebar.multiselect(
-    "Choose Market data to include", options=list(market_options.keys()),
+    "Choose city datasets to include", options=list(market_options.keys()),
     default=list(market_options.keys())
 )
 
-# Load and concatenate selected markets
+# Load and concatenate selected market files
 dfs = []
-for market in selected_markets:
-    file = market_options[market]
+for city in selected_markets:
+    file = market_options[city]
     if os.path.exists(file):
-        dfs.append(load_data(file))
+        d = load_data(file)
+        # override city column to match city key
+        d["city"] = city
+        d["location_info"] = d["latitude"].astype(str) + ", " + d["longitude"].astype(str) + f" - {city}"
+        d["market"] = city
+        dfs.append(d)
     else:
         st.sidebar.error(f"File not found: {file}")
 
@@ -74,7 +79,6 @@ data = pd.concat(dfs, ignore_index=True)
 # ------------------------------------------------
 min_date = data["reading_timestamp"].dt.date.min()
 max_date = data["reading_timestamp"].dt.date.max()
-
 st.sidebar.header("Filters")
 date_range = st.sidebar.date_input("Period", [min_date, max_date])
 
@@ -88,7 +92,6 @@ else:
         default=list(data["product"].unique()),
         key="prod_sel"
     )
-
 # Operator filter
 if st.sidebar.checkbox("Select all Operators", value=True, key="op_all"):
     selected_operators = list(data["operator"].unique())
@@ -99,25 +102,25 @@ else:
         default=list(data["operator"].unique()),
         key="op_sel"
     )
-
-# City filter
-if st.sidebar.checkbox("Select all Cities", value=True, key="city_all"):
-    selected_cities = list(data["city"].unique())
+# City filter (by location info)
+if st.sidebar.checkbox("Select all Locations", value=True, key="loc_all"):
+    selected_locations = list(data["location_info"].unique())
 else:
-    selected_cities = st.sidebar.multiselect(
-        "City",
-        options=data["city"].unique(),
-        default=list(data["city"].unique()),
-        key="city_sel"
+    selected_locations = st.sidebar.multiselect(
+        "Location",
+        options=data["location_info"].unique(),
+        default=list(data["location_info"].unique()),
+        key="loc_sel"
     )
 
 # Apply filters
 data["date"] = data["reading_timestamp"].dt.date
 filtered = data[
+    data['market'].isin(selected_markets) &
     data["date"].between(date_range[0], date_range[1]) &
     data["product"].isin(selected_products) &
     data["operator"].isin(selected_operators) &
-    data["city"].isin(selected_cities)
+    data["location_info"].isin(selected_locations)
 ]
 
 # ------------------------------------------------
@@ -125,7 +128,6 @@ filtered = data[
 # ------------------------------------------------
 st.header("🚦 Executive Snapshot")
 c1, c2, c3, c4, c5 = st.columns(5)
-
 if not filtered.empty:
     total_shipments = len(filtered)
     compliance_pct = filtered["in_range"].mean() * 100
@@ -134,7 +136,6 @@ if not filtered.empty:
     co2_saved = ((0.05 - 0.01) * len(filtered) * filtered["unit_co2_emitted"].mean())
 else:
     total_shipments = compliance_pct = incident_pct = cost_out_range = co2_saved = 0
-
 c1.metric("% Compliant Shipments", f"{compliance_pct:.1f}%")
 c2.metric("% Shipments with Incidents", f"{incident_pct:.1f}%")
 c3.metric("📦 Total Shipments", f"{total_shipments}")
@@ -147,19 +148,17 @@ c5.metric("🌱 CO₂ Saved (kg)", f"{co2_saved:.1f}")
 st.header("📌 Operational Control")
 st.subheader("🚨 Alert Center")
 st.markdown("_Select an alert from the table below to view further details._")
-
 alert_df = filtered[filtered['out_of_range']].sort_values('reading_timestamp', ascending=False)
-
 if alert_df.empty:
     st.success("✅ No alerts to show.")
 else:
-    sel = alert_df[[
+    editor_df = alert_df[[
         "shipment_id","reading_timestamp","operator","product",
-        "severity","city","latitude","longitude"
+        "severity","location_info"
     ]].copy()
-    sel.insert(0, "Select", False)
+    editor_df.insert(0, "Select", False)
     st.data_editor(
-        sel.drop(columns=["latitude","longitude"]),
+        editor_df,
         hide_index=True, use_container_width=True, height=300,
         column_config={"Select": st.column_config.CheckboxColumn(required=True)},
         key="alert_selector"
@@ -172,16 +171,12 @@ st.subheader("📦 All Products")
 st.markdown("_All products matching current filters with full details._")
 prod_df = filtered[[
     "shipment_id","reading_timestamp","operator","product",
-        "severity","city","latitude","longitude"
+    "severity","location_info"
 ]].drop_duplicates().copy()
-prod_df.columns = [
-    "Shipment ID","Timestamp","Operator","Product",
-    "Severity","City","latitude","longitude"
-]
+prod_df.columns = ["Shipment ID","Timestamp","Operator","Product",
+                   "Severity","Location"]
 st.dataframe(
-    prod_df.drop(columns=["latitude","longitude"])\
-        .sort_values("Timestamp",ascending=False),
-    use_container_width=True
+    prod_df.sort_values("Timestamp",ascending=False), use_container_width=True
 )
 
 # ------------------------------------------------
@@ -189,14 +184,15 @@ st.dataframe(
 # ------------------------------------------------
 st.subheader("📋 All Shipments")
 st.markdown("_Filtered results, including both in-range and out-of-range shipments._")
-full = filtered[[
+full_cols = [
     "shipment_id","reading_timestamp","operator","product",
     "actual_temperature","threshold_min_temperature","threshold_max_temperature",
-    "in_range","out_of_range","shipment_cost_eur","unit_co2_emitted","city"
-]].copy()
+    "in_range","out_of_range","shipment_cost_eur","unit_co2_emitted","location_info"
+]
+full = filtered[full_cols].copy()
 full.columns = [
     "Shipment ID","Timestamp","Operator","Product",
     "Actual Temp (°C)","Min Temp","Max Temp",
-    "In Range","Out of Range","Cost (€)","CO2 Emitted (kg)","City"
+    "In Range","Out of Range","Cost (€)","CO2 Emitted (kg)","Location"
 ]
-st.dataframe(full.sort_values("Timestamp",ascending=False),use_container_width=True)
+st.dataframe(full.sort_values("Timestamp",ascending=False), use_container_width=True)
