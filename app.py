@@ -26,7 +26,7 @@ col1, col2 = st.columns([1, 5])
 with col1:
     st.image(logo, use_container_width=True)
 with col2:
-    st.title("Active Label GDO_3")
+    st.title("Active Label GDO_4")
 
 # ------------------------------------------------
 # DATA
