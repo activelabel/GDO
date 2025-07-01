@@ -164,7 +164,7 @@ full_view_df = filtered[[
     "shipment_id",
     "reading_timestamp",
     "operator",
-    "product" if "product" in filtered.columns else "device",  # fallback per il tuo file
+    product_col = "product" if "product" in filtered.columns else "device"uo file
     "actual_temperature",
     "threshold_min_temperature",
     "threshold_max_temperature",
