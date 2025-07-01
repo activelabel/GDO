@@ -33,9 +33,24 @@ with col2:
 # ------------------------------------------------
 @st.cache_data
 def load_data(path: str):
-    return pd.read_csv(path, parse_dates=["reading_timestamp"])
+    columns = [
+        'operator', 'device', 'reading_timestamp', 'exposure', 'actual_temperature',
+        'threshold_min_temperature', 'threshold_max_temperature', 'shipment_id',
+        'shipment_datetime', 'latitude', 'longitude'
+    ]
 
-data = load_data("italian_shipments_dataset.csv")
+    df = pd.read_csv(
+        path,
+        sep='\s+',
+        header=None,
+        names=columns,
+        parse_dates=["reading_timestamp", "shipment_datetime"],
+        dayfirst=True
+    )
+    return df
+
+data = load_data("Dati_Lettura.txt")
+
 
 
 # FILTERS (with select-all option)
@@ -138,6 +153,40 @@ else:
         column_config={"Select": st.column_config.CheckboxColumn(required=True)},
         key="alert_selector"
     )
+# ------------------------------------------------
+# ALL FILTERED SHIPMENTS TABLE (nuova sezione)
+# ------------------------------------------------
+st.subheader("📋 All Shipments")
+st.markdown("_Filtered results, including both in-range and out-of-range shipments._")
+
+# Tabella semplificata dei dati filtrati
+full_view_df = filtered[[
+    "shipment_id",
+    "reading_timestamp",
+    "operator",
+    "product" if "product" in filtered.columns else "device",  # fallback per il tuo file
+    "actual_temperature",
+    "threshold_min_temperature",
+    "threshold_max_temperature",
+    "in_range" if "in_range" in filtered.columns else "exposure",  # fallback
+    "city"
+]].copy()
+
+# Rinomina colonne per chiarezza
+full_view_df.columns = [
+    "Shipment ID",
+    "Timestamp",
+    "Operator",
+    "Product",
+    "Temperature (°C)",
+    "Min Temp",
+    "Max Temp",
+    "In Range" if "in_range" in filtered.columns else "Exposure",
+    "City"
+]
+
+# Mostra tabella
+st.dataframe(full_view_df.sort_values("Timestamp", ascending=False), use_container_width=True)
 
 # ------------------------------------------------
 # SELECTED ALERTS (dettagli shipment sotto la tabella)
