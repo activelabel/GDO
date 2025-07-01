@@ -33,17 +33,16 @@ with col2:
 # ------------------------------------------------
 @st.cache_data
 def load_data(path: str):
-    # Reads the official Italian shipments CSV
     df = pd.read_csv(
         path,
         parse_dates=["reading_timestamp"],
         dayfirst=True
     )
-    # Ensure required columns exist
     df["city"] = df["city"].astype(str)
     return df
 
-data = load_data("italian_shipments_dataset.csv")
+# Load renamed dataset file
+data = load_data("Market_1_shipments_dataset.csv")
 
 # ------------------------------------------------
 # FILTERS
@@ -130,7 +129,7 @@ else:
         "severity","city","latitude","longitude"
     ]].copy()
     sel.insert(0, "Select", False)
-    edited = st.data_editor(
+    st.data_editor(
         sel.drop(columns=["latitude","longitude"]),
         hide_index=True, use_container_width=True, height=300,
         column_config={"Select": st.column_config.CheckboxColumn(required=True)},
@@ -138,7 +137,7 @@ else:
     )
 
 # ------------------------------------------------
-# 📦 ALL PRODUCTS (nuova sezione)
+# 📦 ALL PRODUCTS
 # ------------------------------------------------
 st.subheader("📦 All Products")
 st.markdown("_All products matching current filters with full details._")
@@ -146,13 +145,15 @@ prod_df = filtered[[
     "shipment_id","reading_timestamp","operator","product",
     "severity","city","latitude","longitude"
 ]].drop_duplicates().copy()
-
-# Rinomina colonne come in Alert Center
 prod_df.columns = [
     "Shipment ID","Timestamp","Operator","Product",
     "Severity","City","latitude","longitude"
 ]
-st.dataframe(prod_df.drop(columns=["latitude","longitude"]).sort_values("Timestamp",ascending=False), use_container_width=True)
+st.dataframe(
+    prod_df.drop(columns=["latitude","longitude"])\
+        .sort_values("Timestamp",ascending=False),
+    use_container_width=True
+)
 
 # ------------------------------------------------
 # 📋 ALL SHIPMENTS
@@ -170,4 +171,3 @@ full.columns = [
     "In Range","Out of Range","Cost (€)","CO2 Emitted (kg)","City"
 ]
 st.dataframe(full.sort_values("Timestamp",ascending=False),use_container_width=True)
-
