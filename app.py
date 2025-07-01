@@ -6,8 +6,6 @@ from pathlib import Path
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 from PIL import Image
 from openai import OpenAI
 
@@ -39,7 +37,6 @@ def load_data(path: str) -> pd.DataFrame:
         parse_dates=["reading_timestamp"],
         dayfirst=True
     )
-    # annotate source (city) from filename
     df["market"] = Path(path).stem
     return df
 
@@ -60,7 +57,6 @@ for city in selected_markets:
     file = market_options[city]
     if os.path.exists(file):
         d = load_data(file)
-        # override city and add location_info
         d["city"] = city
         d["location_info"] = (
             d["latitude"].astype(str) + ", " + d["longitude"].astype(str) + f" - {city}"
@@ -93,7 +89,6 @@ else:
         default=list(data["product"].unique()),
         key="prod_sel"
     )
-
 # Operator filter
 if st.sidebar.checkbox("Select all Operators", value=True, key="op_all"):
     selected_operators = list(data["operator"].unique())
@@ -104,8 +99,7 @@ else:
         default=list(data["operator"].unique()),
         key="op_sel"
     )
-
-# Location filter (by location_info)
+# Location filter
 if st.sidebar.checkbox("Select all Locations", value=True, key="loc_all"):
     selected_locations = list(data["location_info"].unique())
 else:
@@ -172,17 +166,14 @@ else:
 # ------------------------------------------------
 st.subheader("📋 All Shipments")
 st.markdown("_Filtered results, including both in-range and out-of-range shipments._")
-full_cols = [
+full = filtered[[
     "shipment_id","reading_timestamp","operator","product",
     "actual_temperature","threshold_min_temperature","threshold_max_temperature",
     "in_range","out_of_range","shipment_cost_eur","unit_co2_emitted","location_info"
-]
-full = filtered[full_cols].copy()
+]].copy()
 full.columns = [
     "Shipment ID","Timestamp","Operator","Product",
     "Actual Temp (°C)","Min Temp","Max Temp",
     "In Range","Out of Range","Cost (€)","CO2 Emitted (kg)","Location"
 ]
 st.dataframe(full.sort_values("Timestamp",ascending=False), use_container_width=True)
-
-
