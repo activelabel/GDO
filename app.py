@@ -47,6 +47,7 @@ def load_data(path: str):
         parse_dates=["reading_timestamp", "shipment_datetime"],
         dayfirst=True
     )
+    df["city"] = df["latitude"].astype(str) + ", " + df["longitude"].astype(str)
     return df
 
 data = load_data("Dati_Lettura.txt")
@@ -60,7 +61,7 @@ max_date = data["reading_timestamp"].dt.date.max()
 st.sidebar.header("Filters")
 date_range = st.sidebar.date_input("Period", [min_date, max_date])
 
-# Filtro Device
+# Device filter
 if st.sidebar.checkbox("Select all Devices", value=True):
     selected_devices = list(data["device"].unique())
 else:
@@ -70,7 +71,7 @@ else:
         default=list(data["device"].unique())
     )
 
-# Filtro Operatori
+# Operator filter
 if st.sidebar.checkbox("Select all Operators", value=True):
     selected_operators = list(data["operator"].unique())
 else:
@@ -80,18 +81,17 @@ else:
         default=list(data["operator"].unique())
     )
 
-# Filtro Città
+# City filter
 if st.sidebar.checkbox("Select all Cities", value=True):
-    selected_cities = list(data["latitude"].astype(str) + ", " + data["longitude"].astype(str)).unique()
+    selected_cities = list(data["city"].unique())
 else:
     selected_cities = st.sidebar.multiselect(
         "City",
-        options=data["latitude"].astype(str) + ", " + data["longitude"].astype(str),
-        default=list(data["latitude"].astype(str) + ", " + data["longitude"].astype(str))
+        options=data["city"].unique(),
+        default=list(data["city"].unique())
     )
 
-# Filtraggio dati
-data["city"] = data["latitude"].astype(str) + ", " + data["longitude"].astype(str)
+# Apply filters
 filtered = data[
     (data["reading_timestamp"].dt.date.between(date_range[0], date_range[1])) &
     (data["device"].isin(selected_devices)) &
@@ -105,17 +105,24 @@ filtered = data[
 st.header("🚦 Executive Snapshot")
 col1, col2, col3, col4, col5 = st.columns(5)
 
-compliance_pct = 100 - (filtered["actual_temperature"] > filtered["threshold_max_temperature"]).mean() * 100
-incident_pct = 100 - compliance_pct
-total_shipments = len(filtered)
-cost_out_range = 0  # non presente nel file
-co2_saved = 0       # non presente nel file
+if not filtered.empty:
+    total_shipments = len(filtered)
+    out_of_range = (
+        (filtered["actual_temperature"] > filtered["threshold_max_temperature"]) |
+        (filtered["actual_temperature"] < filtered["threshold_min_temperature"])
+    )
+    compliance_pct = 100 - out_of_range.mean() * 100
+    incident_pct = 100 - compliance_pct
+else:
+    total_shipments = 0
+    compliance_pct = 0
+    incident_pct = 0
 
 col1.metric("% Compliant Shipments", f"{compliance_pct:.1f}%")
 col2.metric("% Shipments with Incidents", f"{incident_pct:.1f}%")
 col3.metric("📦 Total Shipments", f"{total_shipments}")
-col4.metric("Total Waste Cost (€)", f"{cost_out_range:.2f}")
-col5.metric("🌱 CO₂ Saved (kg)", f"{co2_saved:.1f}")
+col4.metric("Total Waste Cost (€)", "N/A")
+col5.metric("🌱 CO₂ Saved (kg)", "N/A")
 
 # ------------------------------------------------
 # 📌 OPERATIONAL CONTROL
@@ -124,7 +131,7 @@ st.header("📌 Operational Control")
 st.subheader("🚨 Alert Center")
 st.markdown("_Select an alert from the table below to view further details._")
 
-# Definiamo alert come temperature fuori soglia
+# Alert: temperature out of range
 alert_df = filtered[
     (filtered["actual_temperature"] > filtered["threshold_max_temperature"]) |
     (filtered["actual_temperature"] < filtered["threshold_min_temperature"])
@@ -148,7 +155,7 @@ else:
     )
 
 # ------------------------------------------------
-# 📋 ALL SHIPMENTS (aggiunto)
+# 📋 ALL SHIPMENTS
 # ------------------------------------------------
 st.subheader("📋 All Shipments")
 st.markdown("_Filtered results, including both in-range and out-of-range shipments._")
@@ -162,3 +169,5 @@ full_view_df.columns = [
     "Shipment ID", "Timestamp", "Operator", "Device",
     "Temperature (°C)", "Min Temp", "Max Temp", "Exposure", "City"
 ]
+
+st.dataframe(full_view_df.sort_values("Timestamp", ascending=False), use_container_width=True)
