@@ -1,6 +1,9 @@
 # ------------------------------------------------
 # GEOCODER SETUP
 # ------------------------------------------------
+from geopy.geocoders import Nominatim
+from geopy.extra.rate_limiter import RateLimiter
+
 @st.cache_resource(show_spinner=False)
 def get_reverse_geocoder():
     geolocator = Nominatim(user_agent="active_label_app")
@@ -9,14 +12,7 @@ def get_reverse_geocoder():
 reverse = get_reverse_geocoder()
 
 @st.cache_data(show_spinner=False)
-def reverse_geocode(lat, lon):
-    geolocator = Nominatim(user_agent="active_label_app")
-    return RateLimiter(geolocator.reverse, min_delay_seconds=1)
-
-reverse = get_reverse_geocoder()
-
-@st.cache_data(show_spinner=False)
-def reverse_geocode(lat, lon):
+def reverse_geocode(lat: float, lon: float) -> str:
     try:
         location = reverse((lat, lon), language='en')
         address = location.raw.get('address', {})
