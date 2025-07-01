@@ -8,6 +8,8 @@ import streamlit as st
 import pandas as pd
 from PIL import Image
 from openai import OpenAI
+from geopy.geocoders import Nominatim
+from geopy.extra.rate_limiter import RateLimiter
 
 # OPENAI
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -28,24 +30,45 @@ with col2:
     st.title("Active Label GDO_2")
 
 # ------------------------------------------------
+# GEOCODER SETUP
+# ------------------------------------------------
+@st.cache_data(show_spinner=False)
+def get_reverse_geocoder():
+    geolocator = Nominatim(user_agent="active_label_app")
+    return RateLimiter(geolocator.reverse, min_delay_seconds=1)
+
+reverse = get_reverse_geocoder()
+
+@st.cache_data
+def reverse_geocode(lat: float, lon: float) -> str:
+    try:
+        location = reverse((lat, lon), language="en")
+        address = location.raw.get("address", {})
+        for key in ("municipality", "city", "town", "village"):
+            if key in address:
+                return address[key]
+    except:
+        pass
+    return "Unknown"
+
+# ------------------------------------------------
 # DATA LOADING
 # ------------------------------------------------
 @st.cache_data
-def load_data(path: str, city_name: str) -> pd.DataFrame:
+def load_data(path: str, market_city: str) -> pd.DataFrame:
     df = pd.read_csv(
         path,
         parse_dates=["reading_timestamp"],
         dayfirst=True
     )
-    # Annotate market city and use it as 'Comune'
-    df["Market City"] = city_name
-    df["Comune"] = city_name
-    df["Location Info"] = (
-        df["latitude"].astype(str) + ", " + df["longitude"].astype(str) + f" - {city_name}"
-    )
+    # Annotate market and reverse geocode Comune
+    df["Market City"] = market_city
+    df["Comune"] = df.apply(lambda x: reverse_geocode(x["latitude"], x["longitude"]), axis=1)
     return df
 
-# Sidebar: select markets by city name
+# ------------------------------------------------
+# MARKET SELECTION
+# ------------------------------------------------
 st.sidebar.header("Market Selection by City")
 market_files = {
     "Florence": "Market_1_shipments_dataset.csv",
@@ -59,17 +82,15 @@ selected_cities = st.sidebar.multiselect(
 # Load and merge dataframes
 frames = []
 for city in selected_cities:
-    path = market_files[city]
-    if os.path.exists(path):
-        df_city = load_data(path, city)
+    file = market_files[city]
+    if os.path.exists(file):
+        df_city = load_data(file, city)
         frames.append(df_city)
     else:
-        st.sidebar.error(f"File not found: {path}")
-
+        st.sidebar.error(f"File not found: {file}")
 if not frames:
     st.error("No data loaded. Please upload Market files.")
     st.stop()
-
 data = pd.concat(frames, ignore_index=True)
 
 # ------------------------------------------------
@@ -85,64 +106,49 @@ if st.sidebar.checkbox("Select all Products", value=True):
     sel_prod = data["product"].unique().tolist()
 else:
     sel_prod = st.sidebar.multiselect(
-        "Product", options=data["product"].unique(),
-        default=data["product"].unique()
+        "Product", options=data["product"].unique(), default=data["product"].unique()
     )
-
 # Operator filter
 if st.sidebar.checkbox("Select all Operators", value=True):
     sel_op = data["operator"].unique().tolist()
 else:
     sel_op = st.sidebar.multiselect(
-        "Operator", options=data["operator"].unique(),
-        default=data["operator"].unique()
+        "Operator", options=data["operator"].unique(), default=data["operator"].unique()
     )
-
-# Comune filter (Market City)
+# Comune filter
 if st.sidebar.checkbox("Select all Comuni", value=True):
     sel_com = data["Comune"].unique().tolist()
 else:
     sel_com = st.sidebar.multiselect(
-        "Comune", options=data["Comune"].unique(),
-        default=data["Comune"].unique()
-    )
-
-# Location Info filter
-if st.sidebar.checkbox("Select all Locations", value=True):
-    sel_loc = data["Location Info"].unique().tolist()
-else:
-    sel_loc = st.sidebar.multiselect(
-        "Location", options=data["Location Info"].unique(),
-        default=data["Location Info"].unique()
+        "Comune", options=data["Comune"].unique(), default=data["Comune"].unique()
     )
 
 # Apply filters
-filtered = data[
+df_filt = data[
     (data["reading_timestamp"].dt.date.between(date_range[0], date_range[1])) &
     (data["product"].isin(sel_prod)) &
     (data["operator"].isin(sel_op)) &
-    (data["Comune"].isin(sel_com)) &
-    (data["Location Info"].isin(sel_loc))
+    (data["Comune"].isin(sel_com))
 ]
 
 # ------------------------------------------------
 # EXECUTIVE SNAPSHOT
 # ------------------------------------------------
 st.header("🚦 Executive Snapshot")
-col1, col2, col3, col4, col5 = st.columns(5)
-if not filtered.empty:
-    compliance = filtered["in_range"].mean() * 100
-    incidents = filtered["out_of_range"].mean() * 100
-    total = len(filtered)
-    waste = filtered.loc[filtered["out_of_range"], "shipment_cost_eur"].sum()
-    saved = (0.05 - 0.01) * total * filtered["unit_co2_emitted"].mean()
+cols_metrics = st.columns(5)
+if not df_filt.empty:
+    compliance = df_filt["in_range"].mean() * 100
+    incidents = df_filt["out_of_range"].mean() * 100
+    total = len(df_filt)
+    waste = df_filt.loc[df_filt["out_of_range"], "shipment_cost_eur"].sum()
+    saved = (0.05 - 0.01) * total * df_filt["unit_co2_emitted"].mean()
 else:
     compliance = incidents = total = waste = saved = 0
-col1.metric("% Compliant", f"{compliance:.1f}%")
-col2.metric("% Incidents", f"{incidents:.1f}%")
-col3.metric("Total Shipments", f"{total}")
-col4.metric("Waste Cost (€)", f"{waste:.2f}")
-col5.metric("CO₂ Saved (kg)", f"{saved:.1f}")
+cols_metrics[0].metric("% Compliant", f"{compliance:.1f}%")
+cols_metrics[1].metric("% Incidents", f"{incidents:.1f}%")
+cols_metrics[2].metric("Total Shipments", f"{total}")
+cols_metrics[3].metric("Waste Cost (€)", f"{waste:.2f}")
+cols_metrics[4].metric("CO₂ Saved (kg)", f"{saved:.1f}")
 
 # ------------------------------------------------
 # OPERATIONAL CONTROL
@@ -150,36 +156,31 @@ col5.metric("CO₂ Saved (kg)", f"{saved:.1f}")
 st.header("📌 Operational Control")
 st.subheader("🚨 Alert Center")
 st.markdown("_Select an alert to view details._")
-alerts = filtered[filtered["out_of_range"]].sort_values("reading_timestamp", ascending=False)
+alerts = df_filt[df_filt["out_of_range"]].sort_values("reading_timestamp", ascending=False)
 if alerts.empty:
     st.success("No alerts.")
 else:
-    disp = alerts[[
-        "shipment_id", "reading_timestamp", "operator", "product", "severity", "Comune"
-    ]].copy()
+    disp = alerts[["shipment_id","reading_timestamp","operator","product","severity","Comune"]].copy()
     disp.insert(0, "Select", False)
     st.data_editor(
         disp, hide_index=True, use_container_width=True,
-        column_config={"Select": st.column_config.CheckboxColumn(required=True)},
-        key="alerts"
+        column_config={"Select": st.column_config.CheckboxColumn(required=True)}, key="alerts"
     )
 
 # ------------------------------------------------
 # ALL SHIPMENTS
 # ------------------------------------------------
 st.subheader("📋 All Shipments")
-st.markdown("_Filtered shipments list._")
+st.markdown("_Filtered shipments with Comune._")
 cols = [
-    "shipment_id", "reading_timestamp", "operator", "product",
-    "actual_temperature", "threshold_min_temperature", "threshold_max_temperature",
-    "in_range", "out_of_range", "shipment_cost_eur", "unit_co2_emitted",
-    "Comune", "Location Info"
+    "shipment_id","reading_timestamp","operator","product",
+    "actual_temperature","threshold_min_temperature","threshold_max_temperature",
+    "in_range","out_of_range","shipment_cost_eur","unit_co2_emitted","Comune"
 ]
-all_ship = filtered[cols].copy()
+all_ship = df_filt[cols].copy()
 all_ship.columns = [
-    "Shipment ID", "Timestamp", "Operator", "Product",
-    "Actual Temp (°C)", "Min Temp", "Max Temp",
-    "In Range", "Out of Range", "Cost (€)", "CO₂ Emitted (kg)",
-    "Comune", "Location"
+    "Shipment ID","Timestamp","Operator","Product",
+    "Actual Temp (°C)","Min Temp","Max Temp",
+    "In Range","Out of Range","Cost (€)","CO₂ Emitted (kg)","Comune"
 ]
 st.dataframe(all_ship.sort_values("Timestamp", ascending=False), use_container_width=True)
