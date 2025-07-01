@@ -240,4 +240,6 @@ with right_col:
             'lon': filtered['longitude'].mean()
         },
         height=600,
-        margin=dict(l=0,
+        margin=dict(l=0,r=0,t=0,b=0)
+    )
+    st.plotly_chart(fig, use_container_width=True)
