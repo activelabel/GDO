@@ -7,6 +7,7 @@ from pathlib import Path
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from PIL import Image
 from openai import OpenAI
 
@@ -59,9 +60,11 @@ for city in selected_markets:
     file = market_options[city]
     if os.path.exists(file):
         d = load_data(file)
+        # override city and add location_info
         d["city"] = city
-        d["location_info"] = d["latitude"].astype(str) + ", " + d["longitude"].astype(str) + f" - {city}"
-        d["market"] = city
+        d["location_info"] = (
+            d["latitude"].astype(str) + ", " + d["longitude"].astype(str) + f" - {city}"
+        )
         dfs.append(d)
     else:
         st.sidebar.error(f"File not found: {file}")
@@ -102,7 +105,7 @@ else:
         key="op_sel"
     )
 
-# Location filter (by location info)
+# Location filter (by location_info)
 if st.sidebar.checkbox("Select all Locations", value=True, key="loc_all"):
     selected_locations = list(data["location_info"].unique())
 else:
@@ -163,6 +166,47 @@ else:
         column_config={"Select": st.column_config.CheckboxColumn(required=True)},
         key="alert_selector"
     )
+
+# ------------------------------------------------
+# 🗺️ MAP VIEW
+# ------------------------------------------------
+st.subheader("🗺️ Map of Markets and Shipments")
+# Market centers (blue)
+market_centers = filtered.groupby('market').agg({'latitude':'mean','longitude':'mean'}).reset_index()
+# Shipment points colored by status
+filtered['status_color'] = filtered['in_range'].map({True:'green', False:'red'})
+
+fig = go.Figure()
+# Add market centers
+fig.add_trace(go.Scattermapbox(
+    lat=market_centers['latitude'],
+    lon=market_centers['longitude'],
+    mode='markers+text',
+    marker=dict(size=15, color='blue'),
+    text=market_centers['market'],
+    textposition='top right',
+    name='Market'
+))
+# Add shipments
+fig.add_trace(go.Scattermapbox(
+    lat=filtered['latitude'],
+    lon=filtered['longitude'],
+    mode='markers',
+    marker=dict(size=8, color=filtered['status_color']),
+    hovertext=filtered['shipment_id'],
+    name='Shipments'
+))
+fig.update_layout(
+    mapbox_style='open-street-map',
+    mapbox_zoom=5,
+    mapbox_center={
+        'lat': filtered['latitude'].mean(),
+        'lon': filtered['longitude'].mean()
+    },
+    height=600,
+    margin=dict(l=0,r=0,t=0,b=0)
+)
+st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------------------------
 # 📋 ALL SHIPMENTS
