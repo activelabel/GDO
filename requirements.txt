@@ -1,0 +1,9 @@
+streamlit
+pandas
+matplotlib
+seaborn
+openai
+python-dotenv
+streamlit-folium
+folium
+plotly
