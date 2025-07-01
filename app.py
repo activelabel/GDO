@@ -33,24 +33,17 @@ with col2:
 # ------------------------------------------------
 @st.cache_data
 def load_data(path: str):
-    columns = [
-        'operator', 'device', 'reading_timestamp', 'exposure', 'actual_temperature',
-        'threshold_min_temperature', 'threshold_max_temperature', 'shipment_id',
-        'shipment_datetime', 'latitude', 'longitude'
-    ]
-
+    # Reads the official Italian shipments CSV
     df = pd.read_csv(
         path,
-        sep=r"\s+",
-        header=None,
-        names=columns,
-        parse_dates=["reading_timestamp", "shipment_datetime"],
+        parse_dates=["reading_timestamp"],
         dayfirst=True
     )
-    df["city"] = df["latitude"].astype(str) + ", " + df["longitude"].astype(str)
+    # Ensure required columns exist
+    df["city"] = df["city"].astype(str)
     return df
 
-data = load_data("Dati_Lettura.txt")
+data = load_data("italian_shipments_dataset.csv")
 
 # ------------------------------------------------
 # FILTERS
@@ -61,14 +54,14 @@ max_date = data["reading_timestamp"].dt.date.max()
 st.sidebar.header("Filters")
 date_range = st.sidebar.date_input("Period", [min_date, max_date])
 
-# Product filter (uses `device` from the dataset)
+# Product filter
 if st.sidebar.checkbox("Select all Products", value=True):
-    selected_products = list(data["device"].unique())
+    selected_products = list(data["product"].unique())
 else:
     selected_products = st.sidebar.multiselect(
         "Product",
-        options=data["device"].unique(),
-        default=list(data["device"].unique())
+        options=data["product"].unique(),
+        default=list(data["product"].unique())
     )
 
 # Operator filter
@@ -91,10 +84,10 @@ else:
         default=list(data["city"].unique())
     )
 
-# Apply filters to data
+# Apply filters
 filtered = data[
     (data["reading_timestamp"].dt.date.between(date_range[0], date_range[1])) &
-    (data["device"].isin(selected_products)) &
+    (data["product"].isin(selected_products)) &
     (data["operator"].isin(selected_operators)) &
     (data["city"].isin(selected_cities))
 ]
@@ -107,22 +100,18 @@ c1, c2, c3, c4, c5 = st.columns(5)
 
 if not filtered.empty:
     total_shipments = len(filtered)
-    out_of_range = (
-        (filtered["actual_temperature"] > filtered["threshold_max_temperature"]) |
-        (filtered["actual_temperature"] < filtered["threshold_min_temperature"])
-    )
-    compliance_pct = 100 - out_of_range.mean() * 100
-    incident_pct = 100 - compliance_pct
+    compliance_pct = filtered["in_range"].mean() * 100
+    incident_pct = filtered["out_of_range"].mean() * 100
+    cost_out_range = filtered.loc[filtered["out_of_range"], "shipment_cost_eur"].sum()
+    co2_saved = ((0.05 - 0.01) * len(filtered) * filtered["unit_co2_emitted"].mean())
 else:
-    total_shipments = 0
-    compliance_pct = 0
-    incident_pct = 0
+    total_shipments = compliance_pct = incident_pct = cost_out_range = co2_saved = 0
 
 c1.metric("% Compliant Shipments", f"{compliance_pct:.1f}%")
 c2.metric("% Shipments with Incidents", f"{incident_pct:.1f}%")
 c3.metric("📦 Total Shipments", f"{total_shipments}")
-c4.metric("Total Waste Cost (€)", "N/A")
-c5.metric("🌱 CO₂ Saved (kg)", "N/A")
+c4.metric("Total Waste Cost (€)", f"{cost_out_range:.2f}")
+c5.metric("🌱 CO₂ Saved (kg)", f"{co2_saved:.1f}")
 
 # ------------------------------------------------
 # 📌 OPERATIONAL CONTROL
@@ -131,34 +120,25 @@ st.header("📌 Operational Control")
 st.subheader("🚨 Alert Center")
 st.markdown("_Select an alert from the table below to view further details._")
 
-alert_df = filtered[
-    (filtered["actual_temperature"] > filtered["threshold_max_temperature"]) |
-    (filtered["actual_temperature"] < filtered["threshold_min_temperature"])
-].sort_values('reading_timestamp', ascending=False)
+alert_df = filtered[filtered['out_of_range']].sort_values('reading_timestamp', ascending=False)
 
 if alert_df.empty:
     st.success("✅ No alerts to show.")
 else:
-    selection_alert_df = alert_df[[
-        "shipment_id", "reading_timestamp", "operator", "device", "city", "latitude", "longitude"
-    ]].copy()
-    selection_alert_df.insert(0, "Select", False)
-
-    edited_alert_df = st.data_editor(
-        selection_alert_df.drop(columns=["latitude", "longitude"]),
-        hide_index=True,
-        use_container_width=True,
-        height=300,
-        column_config={"Select": st.column_config.CheckboxColumn(required=True)},
-        key="alert_selector"
+    sel = alert_df[["shipment_id","reading_timestamp","operator","product","severity","city","latitude","longitude"]].copy()
+    sel.insert(0, "Select", False)
+    edited = st.data_editor(
+        sel.drop(columns=["latitude","longitude"]),
+        hide_index=True,use_container_width=True,height=300,
+        column_config={"Select": st.column_config.CheckboxColumn(required=True)},key="alert_selector"
     )
 
 # ------------------------------------------------
 # 📦 ALL PRODUCTS (nuova sezione)
 # ------------------------------------------------
 st.subheader("📦 All Products")
-st.markdown("_List of all products in the filtered data._")
-products = sorted(filtered["device"].unique())
+st.markdown("_All products matching current filters._")
+products = filtered["product"].unique()
 prod_df = pd.DataFrame({"Product": products})
 st.dataframe(prod_df, use_container_width=True)
 
@@ -167,15 +147,16 @@ st.dataframe(prod_df, use_container_width=True)
 # ------------------------------------------------
 st.subheader("📋 All Shipments")
 st.markdown("_Filtered results, including both in-range and out-of-range shipments._")
-
-full_view_df = filtered[[
-    "shipment_id", "reading_timestamp", "operator", "device",
-    "actual_temperature", "threshold_min_temperature", "threshold_max_temperature", "exposure", "city"
+full = filtered[[
+    "shipment_id","reading_timestamp","operator","product",
+    "actual_temperature","threshold_min_temperature","threshold_max_temperature",
+    "in_range","out_of_range","shipment_cost_eur","unit_co2_emitted","city"
 ]].copy()
-
-full_view_df.columns = [
-    "Shipment ID", "Timestamp", "Operator", "Product",
-    "Temperature (°C)", "Min Temp", "Max Temp", "Exposure", "City"
+full.columns = [
+    "Shipment ID","Timestamp","Operator","Product",
+    "Actual Temp (°C)","Min Temp","Max Temp",
+    "In Range","Out of Range","Cost (€)","CO2 Emitted (kg)","City"
 ]
+st.dataframe(full.sort_values("Timestamp",ascending=False),use_container_width=True)
 
-st.dataframe(full_view_df.sort_values("Timestamp", ascending=False), use_container_width=True)
+
