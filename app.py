@@ -61,12 +61,12 @@ max_date = data["reading_timestamp"].dt.date.max()
 st.sidebar.header("Filters")
 date_range = st.sidebar.date_input("Period", [min_date, max_date])
 
-# Device filter
-if st.sidebar.checkbox("Select all Devices", value=True):
-    selected_devices = list(data["device"].unique())
+# Product filter (uses `device` from the dataset)
+if st.sidebar.checkbox("Select all Products", value=True):
+    selected_products = list(data["device"].unique())
 else:
-    selected_devices = st.sidebar.multiselect(
-        "Device",
+    selected_products = st.sidebar.multiselect(
+        "Product",
         options=data["device"].unique(),
         default=list(data["device"].unique())
     )
@@ -91,10 +91,10 @@ else:
         default=list(data["city"].unique())
     )
 
-# Apply filters
+# Apply filters to data
 filtered = data[
     (data["reading_timestamp"].dt.date.between(date_range[0], date_range[1])) &
-    (data["device"].isin(selected_devices)) &
+    (data["device"].isin(selected_products)) &
     (data["operator"].isin(selected_operators)) &
     (data["city"].isin(selected_cities))
 ]
@@ -103,7 +103,7 @@ filtered = data[
 # EXECUTIVE SNAPSHOT
 # ------------------------------------------------
 st.header("🚦 Executive Snapshot")
-col1, col2, col3, col4, col5 = st.columns(5)
+c1, c2, c3, c4, c5 = st.columns(5)
 
 if not filtered.empty:
     total_shipments = len(filtered)
@@ -118,11 +118,11 @@ else:
     compliance_pct = 0
     incident_pct = 0
 
-col1.metric("% Compliant Shipments", f"{compliance_pct:.1f}%")
-col2.metric("% Shipments with Incidents", f"{incident_pct:.1f}%")
-col3.metric("📦 Total Shipments", f"{total_shipments}")
-col4.metric("Total Waste Cost (€)", "N/A")
-col5.metric("🌱 CO₂ Saved (kg)", "N/A")
+c1.metric("% Compliant Shipments", f"{compliance_pct:.1f}%")
+c2.metric("% Shipments with Incidents", f"{incident_pct:.1f}%")
+c3.metric("📦 Total Shipments", f"{total_shipments}")
+c4.metric("Total Waste Cost (€)", "N/A")
+c5.metric("🌱 CO₂ Saved (kg)", "N/A")
 
 # ------------------------------------------------
 # 📌 OPERATIONAL CONTROL
@@ -131,7 +131,6 @@ st.header("📌 Operational Control")
 st.subheader("🚨 Alert Center")
 st.markdown("_Select an alert from the table below to view further details._")
 
-# Alert: temperature out of range
 alert_df = filtered[
     (filtered["actual_temperature"] > filtered["threshold_max_temperature"]) |
     (filtered["actual_temperature"] < filtered["threshold_min_temperature"])
@@ -166,7 +165,7 @@ full_view_df = filtered[[
 ]].copy()
 
 full_view_df.columns = [
-    "Shipment ID", "Timestamp", "Operator", "Device",
+    "Shipment ID", "Timestamp", "Operator", "Product",
     "Temperature (°C)", "Min Temp", "Max Temp", "Exposure", "City"
 ]
 
