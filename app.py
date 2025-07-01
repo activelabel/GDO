@@ -125,22 +125,34 @@ alert_df = filtered[filtered['out_of_range']].sort_values('reading_timestamp', a
 if alert_df.empty:
     st.success("✅ No alerts to show.")
 else:
-    sel = alert_df[["shipment_id","reading_timestamp","operator","product","severity","city","latitude","longitude"]].copy()
+    sel = alert_df[[
+        "shipment_id","reading_timestamp","operator","product",
+        "severity","city","latitude","longitude"
+    ]].copy()
     sel.insert(0, "Select", False)
     edited = st.data_editor(
         sel.drop(columns=["latitude","longitude"]),
-        hide_index=True,use_container_width=True,height=300,
-        column_config={"Select": st.column_config.CheckboxColumn(required=True)},key="alert_selector"
+        hide_index=True, use_container_width=True, height=300,
+        column_config={"Select": st.column_config.CheckboxColumn(required=True)},
+        key="alert_selector"
     )
 
 # ------------------------------------------------
 # 📦 ALL PRODUCTS (nuova sezione)
 # ------------------------------------------------
 st.subheader("📦 All Products")
-st.markdown("_All products matching current filters._")
-products = filtered["product"].unique()
-prod_df = pd.DataFrame({"Product": products})
-st.dataframe(prod_df, use_container_width=True)
+st.markdown("_All products matching current filters with full details._")
+prod_df = filtered[[
+    "shipment_id","reading_timestamp","operator","product",
+    "severity","city","latitude","longitude"
+]].drop_duplicates().copy()
+
+# Rinomina colonne come in Alert Center
+prod_df.columns = [
+    "Shipment ID","Timestamp","Operator","Product",
+    "Severity","City","latitude","longitude"
+]
+st.dataframe(prod_df.drop(columns=["latitude","longitude"]).sort_values("Timestamp",ascending=False), use_container_width=True)
 
 # ------------------------------------------------
 # 📋 ALL SHIPMENTS
@@ -158,5 +170,4 @@ full.columns = [
     "In Range","Out of Range","Cost (€)","CO2 Emitted (kg)","City"
 ]
 st.dataframe(full.sort_values("Timestamp",ascending=False),use_container_width=True)
-
 
