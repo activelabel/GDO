@@ -38,7 +38,6 @@ def load_data(path: str) -> pd.DataFrame:
         parse_dates=["reading_timestamp"],
         dayfirst=True
     )
-    # city column already set in file
     # annotate source (city) from filename
     df["market"] = Path(path).stem
     return df
@@ -60,7 +59,6 @@ for city in selected_markets:
     file = market_options[city]
     if os.path.exists(file):
         d = load_data(file)
-        # override city column to match city key
         d["city"] = city
         d["location_info"] = d["latitude"].astype(str) + ", " + d["longitude"].astype(str) + f" - {city}"
         d["market"] = city
@@ -92,6 +90,7 @@ else:
         default=list(data["product"].unique()),
         key="prod_sel"
     )
+
 # Operator filter
 if st.sidebar.checkbox("Select all Operators", value=True, key="op_all"):
     selected_operators = list(data["operator"].unique())
@@ -102,7 +101,8 @@ else:
         default=list(data["operator"].unique()),
         key="op_sel"
     )
-# City filter (by location info)
+
+# Location filter (by location info)
 if st.sidebar.checkbox("Select all Locations", value=True, key="loc_all"):
     selected_locations = list(data["location_info"].unique())
 else:
@@ -163,21 +163,6 @@ else:
         column_config={"Select": st.column_config.CheckboxColumn(required=True)},
         key="alert_selector"
     )
-
-# ------------------------------------------------
-# 📦 ALL PRODUCTS
-# ------------------------------------------------
-st.subheader("📦 All Products")
-st.markdown("_All products matching current filters with full details._")
-prod_df = filtered[[
-    "shipment_id","reading_timestamp","operator","product",
-    "severity","location_info"
-]].drop_duplicates().copy()
-prod_df.columns = ["Shipment ID","Timestamp","Operator","Product",
-                   "Severity","Location"]
-st.dataframe(
-    prod_df.sort_values("Timestamp",ascending=False), use_container_width=True
-)
 
 # ------------------------------------------------
 # 📋 ALL SHIPMENTS
