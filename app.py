@@ -47,7 +47,7 @@ def load_data(path: str) -> pd.DataFrame:
 st.sidebar.header("Market Selection")
 market_options = {
     "Market 1": "Market_1_shipments_dataset.csv",
-    "Market 2": "Market_2_shipments_dataset.csv"
+    "Rome": "Market_2_shipments_dataset.csv"
 }
 selected_markets = st.sidebar.multiselect(
     "Choose Market data to include", options=list(market_options.keys()),
