@@ -7,4 +7,3 @@ python-dotenv
 streamlit-folium
 folium
 plotly
-geopy
