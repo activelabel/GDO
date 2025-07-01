@@ -32,17 +32,42 @@ with col2:
 # DATA
 # ------------------------------------------------
 @st.cache_data
-def load_data(path: str):
+def load_data(path: str) -> pd.DataFrame:
     df = pd.read_csv(
         path,
         parse_dates=["reading_timestamp"],
         dayfirst=True
     )
     df["city"] = df["city"].astype(str)
+    # annotate source file
+    df["market"] = Path(path).stem
     return df
 
-# Load renamed dataset file
-data = load_data("Market_1_shipments_dataset.csv")
+# Sidebar: select market datasets
+st.sidebar.header("Market Selection")
+market_options = {
+    "Market 1": "Market_1_shipments_dataset.csv",
+    "Market 2": "Market_2_shipments_dataset.csv"
+}
+selected_markets = st.sidebar.multiselect(
+    "Choose Market data to include", options=list(market_options.keys()),
+    default=list(market_options.keys())
+)
+
+# Load and concatenate selected markets
+dfs = []
+for market in selected_markets:
+    file = market_options[market]
+    if os.path.exists(file):
+        dfs.append(load_data(file))
+    else:
+        st.sidebar.error(f"File not found: {file}")
+
+if not dfs:
+    st.error("No market data selected or files missing.")
+    st.stop()
+
+data = pd.concat(dfs, ignore_index=True)
 
 # ------------------------------------------------
 # FILTERS
@@ -54,41 +79,45 @@ st.sidebar.header("Filters")
 date_range = st.sidebar.date_input("Period", [min_date, max_date])
 
 # Product filter
-if st.sidebar.checkbox("Select all Products", value=True):
+if st.sidebar.checkbox("Select all Products", value=True, key="prod_all"):
     selected_products = list(data["product"].unique())
 else:
     selected_products = st.sidebar.multiselect(
         "Product",
         options=data["product"].unique(),
-        default=list(data["product"].unique())
+        default=list(data["product"].unique()),
+        key="prod_sel"
     )
 
 # Operator filter
-if st.sidebar.checkbox("Select all Operators", value=True):
+if st.sidebar.checkbox("Select all Operators", value=True, key="op_all"):
     selected_operators = list(data["operator"].unique())
 else:
     selected_operators = st.sidebar.multiselect(
         "Operator",
         options=data["operator"].unique(),
-        default=list(data["operator"].unique())
+        default=list(data["operator"].unique()),
+        key="op_sel"
     )
 
 # City filter
-if st.sidebar.checkbox("Select all Cities", value=True):
+if st.sidebar.checkbox("Select all Cities", value=True, key="city_all"):
     selected_cities = list(data["city"].unique())
 else:
     selected_cities = st.sidebar.multiselect(
         "City",
         options=data["city"].unique(),
-        default=list(data["city"].unique())
+        default=list(data["city"].unique()),
+        key="city_sel"
     )
 
 # Apply filters
+data["date"] = data["reading_timestamp"].dt.date
 filtered = data[
-    (data["reading_timestamp"].dt.date.between(date_range[0], date_range[1])) &
-    (data["product"].isin(selected_products)) &
-    (data["operator"].isin(selected_operators)) &
-    (data["city"].isin(selected_cities))
+    data["date"].between(date_range[0], date_range[1]) &
+    data["product"].isin(selected_products) &
+    data["operator"].isin(selected_operators) &
+    data["city"].isin(selected_cities)
 ]
 
 # ------------------------------------------------
@@ -143,7 +172,7 @@ st.subheader("📦 All Products")
 st.markdown("_All products matching current filters with full details._")
 prod_df = filtered[[
     "shipment_id","reading_timestamp","operator","product",
-    "severity","city","latitude","longitude"
+        "severity","city","latitude","longitude"
 ]].drop_duplicates().copy()
 prod_df.columns = [
     "Shipment ID","Timestamp","Operator","Product",
