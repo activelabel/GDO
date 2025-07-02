@@ -104,12 +104,14 @@ filtered = data[
 # ------------------------------------------------
 st.header("🚦 Executive Snapshot")
 metrics = st.columns(5)
-if not filtered.empty:
-    comp = filtered["in_range"].mean() * 100
-    inc = filtered["out_of_range"].mean() * 100
-    tot = len(filtered)
-    waste = filtered.loc[filtered["out_of_range"], "shipment_cost_eur"].sum()
-    saved = (0.05 - 0.01) * tot * filtered["unit_co2_emitted"].mean()
+# Only consider records with exposure != 0
+alert_data = filtered[filtered["exposure"] != 0]
+if not alert_data.empty:
+    comp = alert_data["in_range"].mean() * 100
+    inc = alert_data["out_of_range"].mean() * 100
+    tot = len(alert_data)
+    waste = alert_data.loc[alert_data["out_of_range"], "shipment_cost_eur"].sum()
+    saved = (0.05 - 0.01) * tot * alert_data["unit_co2_emitted"].mean()
 else:
     comp = inc = tot = waste = saved = 0
 metrics[0].metric("% Compliant", f"{comp:.1f}%")
@@ -120,28 +122,6 @@ metrics[4].metric("CO₂ Saved (kg)", f"{saved:.1f}")
 
 # ------------------------------------------------
 # OPERATIONAL CONTROL
-# ------------------------------------------------
-st.header("📌 Operational Control")
-st.subheader("🚨 Alert Center")
-st.markdown("_Select an alert to view details._")
-alerts = filtered[filtered["out_of_range"]].sort_values("reading_timestamp", ascending=False)
-if alerts.empty:
-    st.success("No alerts.")
-else:
-    # Reorder columns: Market Label first, exposure last
-    disp = alerts[["Market Label", "shipment_id", "reading_timestamp", "operator", "product", "severity", "Time Lost (h)", "exposure"]].copy()
-    disp = disp.rename(columns={"exposure": "Exposure (°C)"})
-    disp.insert(0, "Select", False)
-    st.data_editor(
-        disp,
-        hide_index=True,
-        use_container_width=True,
-        column_config={"Select": st.column_config.CheckboxColumn(required=True)},
-        key="alerts"
-    )
-
-# ------------------------------------------------
-# ALL SHIPMENTS
 # ------------------------------------------------
 st.subheader("📋 All Shipments")
 st.markdown("_Filtered shipments list._")
