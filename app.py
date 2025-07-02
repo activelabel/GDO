@@ -145,31 +145,35 @@ else:
 # ------------------------------------------------
 st.subheader("📋 All Shipments")
 st.markdown("_Filtered shipments list._")
-# Move Market Label as first column
+# Columns in desired order, with Market Label first
 cols = [
-    "Market Label", "shipment_id", "reading_timestamp", "operator", "product",
-    "actual_temperature", "threshold_min_temperature", "threshold_max_temperature",
-    "in_range", "out_of_range", "shipment_cost_eur", "unit_co2_emitted"
+    "Market Label",
+    "shipment_id",
+    "reading_timestamp",
+    "operator",
+    "product",
+    "actual_temperature",
+    "threshold_min_temperature",
+    "threshold_max_temperature",
+    "in_range",
+    "out_of_range",
+    "shipment_cost_eur",
+    "unit_co2_emitted"
 ]
 all_ship = filtered[cols].copy()
-# Rename columns, ensuring headers for all
+# Rename columns, ensure header for each
 all_ship.columns = [
-    "Market Label", "Shipment ID", "Timestamp", "Operator", "Product",
-    "Actual Temp (°C)", "Min Temp", "Max Temp",
-    "In Range", "Out of Range", "Cost (€)", "CO₂ Emitted (kg)"
-]
-st.dataframe(all_ship.sort_values("Timestamp", ascending=False), use_container_width=True)
-st.subheader("📋 All Shipments")
-st.markdown("_Filtered shipments list._")
-cols = [
-    "shipment_id", "reading_timestamp", "operator", "product",
-    "actual_temperature", "threshold_min_temperature", "threshold_max_temperature",
-    "in_range", "out_of_range", "shipment_cost_eur", "unit_co2_emitted", "Market Label"
-]
-all_ship = filtered[cols].copy()
-all_ship.columns = [
-    "Shipment ID", "Timestamp", "Operator", "Product",
-    "Actual Temp (°C)", "Min Temp", "Max Temp",
-    "In Range", "Out of Range", "Cost (€)", "CO₂ Emitted (kg)", "Market Label"
+    "Market Label",
+    "Shipment ID",
+    "Timestamp",
+    "Operator",
+    "Product",
+    "Actual Temp (°C)",
+    "Min Temp",
+    "Max Temp",
+    "In Range",
+    "Out of Range",
+    "Cost (€)",
+    "CO₂ Emitted (kg)"
 ]
 st.dataframe(all_ship.sort_values("Timestamp", ascending=False), use_container_width=True)
