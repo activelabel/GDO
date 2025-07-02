@@ -123,6 +123,31 @@ metrics[4].metric("CO₂ Saved (kg)", f"{saved:.1f}")
 # ------------------------------------------------
 # OPERATIONAL CONTROL
 # ------------------------------------------------
+st.header("📌 Operational Control")
+
+# 🚨 Alert Center
+st.subheader("🚨 Alert Center")
+st.markdown("_Select an alert to view details._")
+# Only show alerts: exposure != 0 and out_of_range
+alerts = filtered[(filtered["exposure"] != 0) & (filtered["out_of_range"])].sort_values("reading_timestamp", ascending=False)
+if alerts.empty:
+    st.success("No alerts.")
+else:
+    # Reorder for Alert Center: Select, Market Label, shipment_id, timestamp, operator, product, severity, Time Lost, Exposure
+    disp = alerts[["Market Label", "shipment_id", "reading_timestamp", "operator", "product", "severity", "Time Lost (h)", "exposure"]].copy()
+    disp = disp.rename(columns={"exposure": "Exposure (°C)"})
+    disp.insert(0, "Select", False)
+    st.data_editor(
+        disp,
+        hide_index=True,
+        use_container_width=True,
+        column_config={"Select": st.column_config.CheckboxColumn(required=True)},
+        key="alerts"
+    )
+
+# ------------------------------------------------
+# ALL SHIPMENTS
+# ------------------------------------------------
 st.subheader("📋 All Shipments")
 st.markdown("_Filtered shipments list._")
 # Columns in desired order, with Market Label first
