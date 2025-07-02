@@ -165,7 +165,7 @@ st.dataframe(all_ship.sort_values("Timestamp", ascending=False), use_container_w
 # MAPPA MERCATI
 # ------------------------------------------------
 st.subheader("🗺️ Market Locations")
-# Coordinates for each Market City
+# Base coordinates for each city center
 city_coords = {
     "Rome": (41.9028, 12.4964),
     "Florence": (43.7696, 11.2558),
@@ -173,8 +173,28 @@ city_coords = {
 }
 # Initialize folium map centered in Italy
 tile_map = folium.Map(location=[42.5, 12.5], zoom_start=5)
-# Add markers
-for city, coords in city_coords.items():
-    folium.Marker(location=coords, popup=city, icon=folium.Icon(color='blue')).add_to(tile_map)
-# Display the map
+# Determine market labels for each city
+market_map = {}
+for label in filtered["Market Label"].unique():
+    # assume label format 'MarketX City'
+    city = label.split()[-1]
+    market_map.setdefault(city, []).append(label)
+# Place a marker for each market with slight offset around city center
+for city, labels in market_map.items():
+    if city not in city_coords:
+        continue
+    base_lat, base_lon = city_coords[city]
+    n = len(labels)
+    for i, label in enumerate(labels):
+        angle = 2 * np.pi * i / max(n, 1)
+        # offset radius in degrees (~5 km)
+        r = 0.05
+        lat = base_lat + r * np.sin(angle)
+        lon = base_lon + r * np.cos(angle)
+        folium.Marker(
+            location=[lat, lon],
+            popup=label,
+            icon=folium.Icon(color='blue', icon='info-sign')
+        ).add_to(tile_map)
+# Render the map
 folium_static(tile_map)
