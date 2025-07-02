@@ -3,6 +3,7 @@ from pathlib import Path
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 from PIL import Image
 from openai import OpenAI
 
@@ -34,6 +35,16 @@ def load_data(path: str) -> pd.DataFrame:
         parse_dates=["reading_timestamp"],
         dayfirst=True
     )
+    # Add ±5% random noise to actual_temperature for variation
+    np.random.seed(42)
+    if "actual_temperature" in df.columns:
+        noise = np.random.uniform(-0.05, 0.05, size=len(df))
+        df["actual_temperature"] = df["actual_temperature"] * (1 + noise)
+    # Compute Time Lost (h): exposure * 24
+    if "exposure" in df.columns:
+        df["Time Lost (h)"] = df["exposure"] * 24.0
+    else:
+        df["Time Lost (h)"] = 0
     return df
 
 # Load single dataset
@@ -117,7 +128,8 @@ alerts = filtered[filtered["out_of_range"]].sort_values("reading_timestamp", asc
 if alerts.empty:
     st.success("No alerts.")
 else:
-    disp = alerts[["shipment_id","reading_timestamp","operator","product","severity","Market Label"]].copy()
+    # Include Time Lost only in alert center
+    disp = alerts[["shipment_id", "reading_timestamp", "operator", "product", "severity", "Market Label", "Time Lost (h)"]].copy()
     disp.insert(0, "Select", False)
     st.data_editor(
         disp,
@@ -133,14 +145,14 @@ else:
 st.subheader("📋 All Shipments")
 st.markdown("_Filtered shipments list._")
 cols = [
-    "shipment_id","reading_timestamp","operator","product",
-    "actual_temperature","threshold_min_temperature","threshold_max_temperature",
-    "in_range","out_of_range","shipment_cost_eur","unit_co2_emitted","Market Label"
+    "shipment_id", "reading_timestamp", "operator", "product",
+    "actual_temperature", "threshold_min_temperature", "threshold_max_temperature",
+    "in_range", "out_of_range", "shipment_cost_eur", "unit_co2_emitted", "Market Label"
 ]
 all_ship = filtered[cols].copy()
 all_ship.columns = [
-    "Shipment ID","Timestamp","Operator","Product",
-    "Actual Temp (°C)","Min Temp","Max Temp",
-    "In Range","Out of Range","Cost (€)","CO₂ Emitted (kg)","Market Label"
+    "Shipment ID", "Timestamp", "Operator", "Product",
+    "Actual Temp (°C)", "Min Temp", "Max Temp",
+    "In Range", "Out of Range", "Cost (€)", "CO₂ Emitted (kg)", "Market Label"
 ]
 st.dataframe(all_ship.sort_values("Timestamp", ascending=False), use_container_width=True)
