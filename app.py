@@ -243,7 +243,8 @@ if st.button("Generate Report"):
     report_lines.append(f"Estimated CO₂ saved: {co2_saved:.1f} kg")
     report_lines.append("Top 3 markets by incident rate:")
     for _, row in top_markets.iterrows():
-        report_lines.append(f"- {row['Market Label']}: {row['Pct Incidents']:.1f}% incidents")    report_text = "
+        report_lines.append(f"- {row['Market Label']}: {row['Pct Incidents']:.1f}% incidents")
+    report_text = "
 ".join(report_lines)
     # Display and download
     st.text_area("Report Preview", report_text, height=200)
