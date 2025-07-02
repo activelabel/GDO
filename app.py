@@ -162,6 +162,19 @@ all_ship.columns = [
 st.dataframe(all_ship.sort_values("Timestamp", ascending=False), use_container_width=True)
 
 # ------------------------------------------------
+# MARKET INCIDENT RATES
+# ------------------------------------------------
+st.subheader("📈 Market Incident Rates")
+# Show a summary table for % incidents per market
+summary = (
+    filtered
+    .groupby("Market Label")
+    .apply(lambda df: (df["exposure"] > 0).mean() * 100)
+    .reset_index(name="Pct Incidents")
+)
+st.dataframe(summary, use_container_width=True)
+
+# ------------------------------------------------
 # MAPPA MERCATI
 # ------------------------------------------------
 st.subheader("🗺️ Market Locations")
@@ -179,7 +192,6 @@ for label in filtered["Market Label"].unique():
     city = label.split()[-1]
     market_map.setdefault(city, []).append(label)
 # Place a marker for each market with color reflecting % Incidents
-env = filtered
 for city, labels in market_map.items():
     if city not in city_coords:
         continue
@@ -190,11 +202,8 @@ for city, labels in market_map.items():
         r = 0.05  # offset radius in degrees (~5 km)
         lat = base_lat + r * np.sin(angle)
         lon = base_lon + r * np.cos(angle)
-        # Calculate % incidents for this market
-        df_label = filtered[filtered["Market Label"] == label]
-        total_label = len(df_label)
-        incident_label = df_label[df_label["exposure"] > 0].shape[0]
-        pct_label = (incident_label / total_label * 100) if total_label > 0 else 0
+        # Look up % incidents in summary
+        pct_label = float(summary.loc[summary["Market Label"] == label, "Pct Incidents"])
         # Determine marker color
         if pct_label < 2:
             color = 'green'
