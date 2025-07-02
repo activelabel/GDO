@@ -244,6 +244,7 @@ if st.button("Generate Report"):
     report_lines.append("Top 3 markets by incident rate:")
     for _, row in top_markets.iterrows():
         report_lines.append(f"- {row['Market Label']}: {row['Pct Incidents']:.1f}% incidents")
+    # Join lines with newline
     report_text = "
 ".join(report_lines)
     # Display and download
