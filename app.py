@@ -176,10 +176,10 @@ tile_map = folium.Map(location=[42.5, 12.5], zoom_start=5)
 # Determine market labels for each city
 market_map = {}
 for label in filtered["Market Label"].unique():
-    # assume label format 'MarketX City'
     city = label.split()[-1]
     market_map.setdefault(city, []).append(label)
-# Place a marker for each market with slight offset around city center
+# Place a marker for each market with color reflecting % Incidents
+env = filtered
 for city, labels in market_map.items():
     if city not in city_coords:
         continue
@@ -187,14 +187,25 @@ for city, labels in market_map.items():
     n = len(labels)
     for i, label in enumerate(labels):
         angle = 2 * np.pi * i / max(n, 1)
-        # offset radius in degrees (~5 km)
-        r = 0.05
+        r = 0.05  # offset radius in degrees (~5 km)
         lat = base_lat + r * np.sin(angle)
         lon = base_lon + r * np.cos(angle)
+        # Calculate % incidents for this market
+        df_label = filtered[filtered["Market Label"] == label]
+        total_label = len(df_label)
+        incident_label = df_label[df_label["exposure"] > 0].shape[0]
+        pct_label = (incident_label / total_label * 100) if total_label > 0 else 0
+        # Determine marker color
+        if pct_label < 2:
+            color = 'green'
+        elif pct_label > 15:
+            color = 'red'
+        else:
+            color = 'yellow'
         folium.Marker(
             location=[lat, lon],
-            popup=label,
-            icon=folium.Icon(color='blue', icon='info-sign')
+            popup=f"{label}: {pct_label:.1f}% incidents",
+            icon=folium.Icon(color=color, icon='info-sign')
         ).add_to(tile_map)
 # Render the map
 folium_static(tile_map)
