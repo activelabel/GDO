@@ -8,7 +8,7 @@ from PIL import Image
 from openai import OpenAI
 
 # OPENAI
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+client = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", ""))
 
 # ------------------------------------------------
 # PAGE CONFIG
@@ -26,71 +26,48 @@ with col2:
     st.title("Active Label GDO_2")
 
 # ------------------------------------------------
-# DATA LOADING
+# DATA LOADING & PREPROCESSING
 # ------------------------------------------------
 @st.cache_data
 def load_data(path: str) -> pd.DataFrame:
-    df = pd.read_csv(
-        path,
-        parse_dates=["reading_timestamp"],
-        dayfirst=True
-    )
+    df = pd.read_csv(path, parse_dates=["reading_timestamp"], dayfirst=True)
+    # Add ±5% noise
+    np.random.seed(42)
+    if "actual_temperature" in df.columns:
+        noise = np.random.uniform(-0.05, 0.05, size=len(df))
+        df["actual_temperature"] *= (1 + noise)
+    # Compute Time Lost (h)
+    if "exposure" in df.columns:
+        df["Time Lost (h)"] = df["exposure"] * 24.0
+    else:
+        df["Time Lost (h)"] = 0.0
     return df
 
-# Load dataset
+# Load single dataset
 data = load_data("Market_1_shipment_dataset.csv")
-
-# ------------------------------------------------
-# DATA PREPROCESSING
-# ------------------------------------------------
-# Add ±5% random noise to actual_temperature
-np.random.seed(42)
-if "actual_temperature" in data.columns:
-    noise = np.random.uniform(-0.05, 0.05, size=len(data))
-    data["actual_temperature"] = data["actual_temperature"] * (1 + noise)
-
-# Compute Time Lost (h): exposure * 24
-if "exposure" in data.columns:
-    data["Time Lost (h)"] = data["exposure"] * 24.0
-else:
-    data["Time Lost (h)"] = 0
 
 # ------------------------------------------------
 # FILTERS
 # ------------------------------------------------
 st.sidebar.header("Filters")
-# Market Label filter
-if st.sidebar.checkbox("Select all Market Labels", value=True):
+# Market Label
+if st.sidebar.checkbox("Select all Market Labels", True):
     sel_label = data["Market Label"].unique().tolist()
 else:
-    sel_label = st.sidebar.multiselect(
-        "Market Label",
-        options=data["Market Label"].unique(),
-        default=data["Market Label"].unique()
-    )
-# Date filter
-date_range = st.sidebar.date_input(
-    "Period",
-    [data["reading_timestamp"].dt.date.min(), data["reading_timestamp"].dt.date.max()]
-)
-# Product filter
-if st.sidebar.checkbox("Select all Products", value=True):
+    sel_label = st.sidebar.multiselect("Market Label", data["Market Label"].unique(), default=data["Market Label"].unique())
+# Date Range
+date_range = st.sidebar.date_input("Period", [data["reading_timestamp"].dt.date.min(), data["reading_timestamp"].dt.date.max()])
+# Product
+if st.sidebar.checkbox("Select all Products", True):
     sel_prod = data["product"].unique().tolist()
 else:
-    sel_prod = st.sidebar.multiselect(
-        "Product",
-        options=data["product"].unique(),
-        default=data["product"].unique()
-    )
-# Operator filter
-if st.sidebar.checkbox("Select all Operators", value=True):
+    sel_prod = st.sidebar.multiselect("Product", data["product"].unique(), default=data["product"].unique())
+# Operator
+if st.sidebar.checkbox("Select all Operators", True):
     sel_op = data["operator"].unique().tolist()
 else:
-    sel_op = st.sidebar.multiselect(
-        "Operator",
-        options=data["operator"].unique(),
-        default=data["operator"].unique()
-    )
+    sel_op = st.sidebar.multiselect("Operator", data["operator"].unique(), default=data["operator"].unique())
+
 # Apply filters
 filtered = data[
     data["Market Label"].isin(sel_label) &
@@ -103,25 +80,64 @@ filtered = data[
 # EXECUTIVE SNAPSHOT
 # ------------------------------------------------
 st.header("🚦 Executive Snapshot")
-metrics = st.columns(5)
-# Total records selected by filters
+col1, col2, col3, col4, col5 = st.columns(5)
+# Total filtered records
 total_records = len(filtered)
-# Number of incidents defined by exposure != 0
-num_incidents = filtered[filtered["exposure"] != 0].shape[0]
-# Percentages
+# Incident records: exposure != 0
+incident_records = filtered[filtered["exposure"] != 0]
+num_incidents = len(incident_records)
+# Compute percentages
 if total_records > 0:
-    inc_pct = num_incidents / total_records * 100
-    comp_pct = 100 - inc_pct
+    pct_incidents = num_incidents / total_records * 100
+    pct_compliant = (total_records - num_incidents) / total_records * 100
 else:
-    comp_pct = inc_pct = 0
-# Waste cost: sum shipment_cost_eur for exposure !=0 and out_of_range
-waste = filtered.loc[(filtered["exposure"] != 0) & (filtered["out_of_range"]), "shipment_cost_eur"].sum()
-# CO2 saved: assume 0.05-0.01 per incident unit_co2_emitted average
-df_alerts = filtered[filtered["exposure"] != 0]
-co2_saved = ((0.05 - 0.01) * num_incidents * df_alerts["unit_co2_emitted"].mean()) if num_incidents > 0 else 0
+    pct_compliant = pct_incidents = 0.0
+# Waste cost: only on incidents out_of_range
+waste_cost = incident_records.loc[incident_records["out_of_range"], "shipment_cost_eur"].sum()
+# CO2 saved: per incident average
+if num_incidents > 0:
+    co2_saved = (0.05 - 0.01) * num_incidents * incident_records["unit_co2_emitted"].mean()
+else:
+    co2_saved = 0.0
 
-metrics[0].metric("% Compliant", f"{comp_pct:.1f}%")
-metrics[1].metric("% Incidents", f"{inc_pct:.1f}%")
-metrics[2].metric("Total Shipments", f"{total_records}")
-metrics[3].metric("Waste Cost (€)", f"{waste:.2f}")
-metrics[4].metric("CO₂ Saved (kg)", f"{co2_saved:.1f}")("CO₂ Saved (kg)", f"{co2_saved:.1f}")
+col1.metric("% Compliant", f"{pct_compliant:.1f}%")
+col2.metric("% Incidents", f"{pct_incidents:.1f}%")
+col3.metric("Total Shipments", f"{total_records}")
+col4.metric("Waste Cost (€)", f"{waste_cost:.2f}")
+col5.metric("CO₂ Saved (kg)", f"{co2_saved:.1f}")
+
+# ------------------------------------------------
+# OPERATIONAL CONTROL
+# ------------------------------------------------
+st.header("📌 Operational Control")
+st.subheader("🚨 Alert Center")
+st.markdown("_Select an alert to view details._")
+alerts = filtered[(filtered["exposure"] != 0) & (filtered["out_of_range"])]
+alerts = alerts.sort_values("reading_timestamp", ascending=False)
+if alerts.empty:
+    st.success("No alerts.")
+else:
+    disp = alerts[["Market Label", "shipment_id", "reading_timestamp", "operator", "product", "severity", "Time Lost (h)", "exposure"]].copy()
+    disp = disp.rename(columns={"exposure": "Exposure (°C)"})
+    disp.insert(0, "Select", False)
+    st.data_editor(
+        disp,
+        hide_index=True,
+        use_container_width=True,
+        column_config={"Select": st.column_config.CheckboxColumn(required=True)},
+        key="alerts"
+    )
+
+# ------------------------------------------------
+# ALL SHIPMENTS
+# ------------------------------------------------
+st.subheader("📋 All Shipments")
+st.markdown("_Filtered shipments list._")
+cols = [
+    "Market Label", "shipment_id", "reading_timestamp", "operator", "product", "actual_temperature", "threshold_min_temperature", "threshold_max_temperature", "in_range", "out_of_range", "shipment_cost_eur", "unit_co2_emitted"
+]
+all_ship = filtered[cols].copy()
+all_ship.columns = [
+    "Market Label", "Shipment ID", "Timestamp", "Operator", "Product", "Actual Temp (°C)", "Min Temp", "Max Temp", "In Range", "Out of Range", "Cost (€)", "CO₂ Emitted (kg)"
+]
+st.dataframe(all_ship.sort_values("Timestamp", ascending=False), use_container_width=True)
