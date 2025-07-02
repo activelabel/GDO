@@ -29,44 +29,25 @@ with col2:
 # DATA LOADING & PREPROCESSING
 # ------------------------------------------------
 @st.cache_data
-"
-"def load_data(path: str) -> pd.DataFrame:
-"
-"    df = pd.read_csv(path, parse_dates=["reading_timestamp"], dayfirst=True)
-"
-"    # Add ±5% noise to actual_temperature
-"
-"    np.random.seed(42)
-"
-"    noise = np.random.uniform(-0.05, 0.05, size=len(df))
-"
-"    df["actual_temperature"] *= (1 + noise)
-"
-"    # Compute dynamic exposure: deviation beyond thresholds
-"
-"    df["exposure"] = np.where(
-"
-"        df["actual_temperature"] > df["threshold_max_temperature"],
-"
-"        df["actual_temperature"] - df["threshold_max_temperature"],
-"
-"        np.where(
-"
-"            df["actual_temperature"] < df["threshold_min_temperature"],
-"
-"            df["threshold_min_temperature"] - df["actual_temperature"],
-"
-"            0.0
-"
-"        )
-"
-"    )
-"
-"    # Compute Time Lost (h)
-"
-"    df["Time Lost (h)"] = df["exposure"] * 24.0
-"
-"    return df
+def load_data(path: str) -> pd.DataFrame:
+    df = pd.read_csv(path, parse_dates=["reading_timestamp"], dayfirst=True)
+    # Add ±5% noise to actual_temperature
+    np.random.seed(42)
+    noise = np.random.uniform(-0.05, 0.05, size=len(df))
+    df["actual_temperature"] *= (1 + noise)
+    # Compute dynamic exposure: deviation beyond thresholds
+    df["exposure"] = np.where(
+        df["actual_temperature"] > df["threshold_max_temperature"],
+        df["actual_temperature"] - df["threshold_max_temperature"],
+        np.where(
+            df["actual_temperature"] < df["threshold_min_temperature"],
+            df["threshold_min_temperature"] - df["actual_temperature"],
+            0.0
+        )
+    )
+    # Compute Time Lost (h)
+    df["Time Lost (h)"] = df["exposure"] * 24.0
+    return df
 
 # Load dataset
 data = load_data("Market_1_shipment_dataset.csv")
