@@ -104,21 +104,29 @@ filtered = data[
 # ------------------------------------------------
 st.header("🚦 Executive Snapshot")
 metrics = st.columns(5)
-# Only consider records with exposure != 0
+# Consider records with exposure != 0 as the alert dataset
 alert_data = filtered[filtered["exposure"] != 0]
-if not alert_data.empty:
-    comp = alert_data["in_range"].mean() * 100
-    inc = alert_data["out_of_range"].mean() * 100
-    tot = len(alert_data)
-    waste = alert_data.loc[alert_data["out_of_range"], "shipment_cost_eur"].sum()
-    saved = (0.05 - 0.01) * tot * alert_data["unit_co2_emitted"].mean()
+# True incidents: those alert_data where out_of_range is True
+incidents = alert_data[alert_data["out_of_range"]]
+# Totals
+tot_alerts = len(alert_data)
+tot_incidents = len(incidents)
+# Calculate percentages
+if tot_alerts > 0:
+    inc_pct = tot_incidents / tot_alerts * 100
+    comp_pct = 100 - inc_pct
 else:
-    comp = inc = tot = waste = saved = 0
-metrics[0].metric("% Compliant", f"{comp:.1f}%")
-metrics[1].metric("% Incidents", f"{inc:.1f}%")
-metrics[2].metric("Total Shipments", f"{tot}")
+    comp_pct = inc_pct = 0
+# Waste cost from actual incident records
+waste = incidents["shipment_cost_eur"].sum() if tot_incidents > 0 else 0
+# CO2 saved: assume saved for all alert_data
+co2_saved = (0.05 - 0.01) * tot_alerts * alert_data["unit_co2_emitted"].mean() if tot_alerts > 0 else 0
+
+metrics[0].metric("% Compliant", f"{comp_pct:.1f}%")
+metrics[1].metric("% Incidents", f"{inc_pct:.1f}%")
+metrics[2].metric("Total Alerts", f"{tot_alerts}")
 metrics[3].metric("Waste Cost (€)", f"{waste:.2f}")
-metrics[4].metric("CO₂ Saved (kg)", f"{saved:.1f}")
+metrics[4].metric("CO₂ Saved (kg)", f"{co2_saved:.1f}")("CO₂ Saved (kg)", f"{saved:.1f}")
 
 # ------------------------------------------------
 # OPERATIONAL CONTROL
