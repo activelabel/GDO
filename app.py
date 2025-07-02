@@ -129,7 +129,7 @@ if alerts.empty:
     st.success("No alerts.")
 else:
     disp = alerts[["shipment_id", "reading_timestamp", "operator", "product", "severity", "exposure", "Market Label", "Time Lost (h)"]].copy()
-    disp = disp.rename(columns={"exposure": "Exposure (°C)"})()
+    disp = disp.rename(columns={"exposure": "Exposure (°C)"})
     disp.insert(0, "Select", False)
     st.data_editor(
         disp,
