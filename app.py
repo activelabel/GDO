@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 from PIL import Image
 from openai import OpenAI
+import folium
+from streamlit_folium import folium_static
 
 # OPENAI
 client = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", ""))
@@ -97,7 +99,7 @@ st.header("🚦 Executive Snapshot")
 col1, col2, col3, col4, col5 = st.columns(5)
 # Total filtered records
 total_records = len(filtered)
-# Incidents: exposure != 0
+# Incidents: exposure > 0
 num_incidents = filtered[filtered["exposure"] > 0].shape[0]
 # Percentages
 pct_incidents = num_incidents / total_records * 100 if total_records else 0
@@ -158,3 +160,21 @@ all_ship.columns = [
     "Min Temp", "Max Temp", "In Range", "Out of Range", "Cost (€)", "CO₂ Emitted (kg)"
 ]
 st.dataframe(all_ship.sort_values("Timestamp", ascending=False), use_container_width=True)
+
+# ------------------------------------------------
+# MAPPA MERCATI
+# ------------------------------------------------
+st.subheader("🗺️ Market Locations")
+# Coordinates for each Market City
+city_coords = {
+    "Rome": (41.9028, 12.4964),
+    "Florence": (43.7696, 11.2558),
+    "Turin": (45.0703, 7.6869)
+}
+# Initialize folium map centered in Italy
+tile_map = folium.Map(location=[42.5, 12.5], zoom_start=5)
+# Add markers
+for city, coords in city_coords.items():
+    folium.Marker(location=coords, popup=city, icon=folium.Icon(color='blue')).add_to(tile_map)
+# Display the map
+folium_static(tile_map)
