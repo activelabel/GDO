@@ -241,8 +241,7 @@ if st.button("Generate Report"):
     report_lines.append(f"Incidents: {num_incidents} ({pct_incidents:.1f}%), Compliant: {pct_compliant:.1f}%")
     report_lines.append(f"Total waste cost: €{waste_cost:.2f}")
     report_lines.append(f"Estimated CO₂ saved: {co2_saved:.1f} kg")
-    report_lines.append("
-Top 3 markets by incident rate:")
+    report_lines.append("Top 3 markets by incident rate:")
     for _, row in top_markets.iterrows():
         report_lines.append(f"- {row['Market Label']}: {row['Pct Incidents']:.1f}% incidents")
     report_text = "
