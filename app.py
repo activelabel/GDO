@@ -128,7 +128,8 @@ alerts = filtered[filtered["out_of_range"]].sort_values("reading_timestamp", asc
 if alerts.empty:
     st.success("No alerts.")
 else:
-    disp = alerts[["shipment_id", "reading_timestamp", "operator", "product", "severity", "exposure", "Market Label", "Time Lost (h)"]].copy()
+    # Reorder columns: Market Label first, exposure last
+    disp = alerts[["Market Label", "shipment_id", "reading_timestamp", "operator", "product", "severity", "Time Lost (h)", "exposure"]].copy()
     disp = disp.rename(columns={"exposure": "Exposure (°C)"})
     disp.insert(0, "Select", False)
     st.data_editor(
@@ -142,6 +143,22 @@ else:
 # ------------------------------------------------
 # ALL SHIPMENTS
 # ------------------------------------------------
+st.subheader("📋 All Shipments")
+st.markdown("_Filtered shipments list._")
+# Move Market Label as first column
+cols = [
+    "Market Label", "shipment_id", "reading_timestamp", "operator", "product",
+    "actual_temperature", "threshold_min_temperature", "threshold_max_temperature",
+    "in_range", "out_of_range", "shipment_cost_eur", "unit_co2_emitted"
+]
+all_ship = filtered[cols].copy()
+# Rename columns, ensuring headers for all
+all_ship.columns = [
+    "Market Label", "Shipment ID", "Timestamp", "Operator", "Product",
+    "Actual Temp (°C)", "Min Temp", "Max Temp",
+    "In Range", "Out of Range", "Cost (€)", "CO₂ Emitted (kg)"
+]
+st.dataframe(all_ship.sort_values("Timestamp", ascending=False), use_container_width=True)
 st.subheader("📋 All Shipments")
 st.markdown("_Filtered shipments list._")
 cols = [
