@@ -35,68 +35,68 @@ def load_data(path: str) -> pd.DataFrame:
         parse_dates=["reading_timestamp"],
         dayfirst=True
     )
-    # Add ±5% random noise to actual_temperature for variation
-    np.random.seed(42)
-    if "actual_temperature" in df.columns:
-        noise = np.random.uniform(-0.05, 0.05, size=len(df))
-        df["actual_temperature"] = df["actual_temperature"] * (1 + noise)
-    # Compute Time Lost (h): exposure * 24
-    if "exposure" in df.columns:
-        df["Time Lost (h)"] = df["exposure"] * 24.0
-    else:
-        df["Time Lost (h)"] = 0
     return df
 
-# Load single dataset
+# Load dataset
 data = load_data("Market_1_shipment_dataset.csv")
+
+# ------------------------------------------------
+# DATA PREPROCESSING
+# ------------------------------------------------
+# Add ±5% random noise to actual_temperature
+np.random.seed(42)
+if "actual_temperature" in data.columns:
+    noise = np.random.uniform(-0.05, 0.05, size=len(data))
+    data["actual_temperature"] = data["actual_temperature"] * (1 + noise)
+
+# Compute Time Lost (h): exposure * 24
+if "exposure" in data.columns:
+    data["Time Lost (h)"] = data["exposure"] * 24.0
+else:
+    data["Time Lost (h)"] = 0
 
 # ------------------------------------------------
 # FILTERS
 # ------------------------------------------------
 st.sidebar.header("Filters")
-
 # Market Label filter
 if st.sidebar.checkbox("Select all Market Labels", value=True):
-    sel_label = list(data["Market Label"].unique())
+    sel_label = data["Market Label"].unique().tolist()
 else:
     sel_label = st.sidebar.multiselect(
         "Market Label",
         options=data["Market Label"].unique(),
-        default=list(data["Market Label"].unique())
+        default=data["Market Label"].unique()
     )
-
 # Date filter
 date_range = st.sidebar.date_input(
     "Period",
     [data["reading_timestamp"].dt.date.min(), data["reading_timestamp"].dt.date.max()]
 )
-
 # Product filter
 if st.sidebar.checkbox("Select all Products", value=True):
-    sel_prod = list(data["product"].unique())
+    sel_prod = data["product"].unique().tolist()
 else:
     sel_prod = st.sidebar.multiselect(
         "Product",
         options=data["product"].unique(),
-        default=list(data["product"].unique())
+        default=data["product"].unique()
     )
-
 # Operator filter
 if st.sidebar.checkbox("Select all Operators", value=True):
-    sel_op = list(data["operator"].unique())
+    sel_op = data["operator"].unique().tolist()
 else:
     sel_op = st.sidebar.multiselect(
         "Operator",
         options=data["operator"].unique(),
-        default=list(data["operator"].unique())
+        default=data["operator"].unique()
     )
-
 # Apply filters
 filtered = data[
-    (data["Market Label"].isin(sel_label)) &
-    (data["reading_timestamp"].dt.date.between(date_range[0], date_range[1])) &
-    (data["product"].isin(sel_prod)) &
-    (data["operator"].isin(sel_op))
+    data["Market Label"].isin(sel_label) &
+    data["reading_timestamp"].dt.date.between(date_range[0], date_range[1]) &
+    data["product"].isin(sel_prod) &
+    data["operator"].isin(sel_op)
 ]
 
 # ------------------------------------------------
@@ -128,8 +128,9 @@ alerts = filtered[filtered["out_of_range"]].sort_values("reading_timestamp", asc
 if alerts.empty:
     st.success("No alerts.")
 else:
-    # Include Time Lost only in alert center
-    disp = alerts[["shipment_id", "reading_timestamp", "operator", "product", "severity", "Market Label", "Time Lost (h)"]].copy()
+    disp = alerts[[
+        "shipment_id", "reading_timestamp", "operator", "product", "severity", "Market Label", "Time Lost (h)"
+    ]].copy()
     disp.insert(0, "Select", False)
     st.data_editor(
         disp,
