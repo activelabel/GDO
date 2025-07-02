@@ -218,3 +218,35 @@ for city, labels in market_map.items():
         ).add_to(tile_map)
 # Render the map
 folium_static(tile_map)
+
+# ------------------------------------------------
+# REPORT GENERATION
+# ------------------------------------------------
+st.header("📝 Quick Report")
+if st.button("Generate Report"):
+    # Basic summary
+    total_records = len(filtered)
+    num_incidents = filtered[filtered["exposure"] > 0].shape[0]
+    pct_incidents = num_incidents / total_records * 100 if total_records else 0.0
+    pct_compliant = 100 - pct_incidents
+    waste_cost = filtered.loc[(filtered["exposure"] > 0) & (filtered["out_of_range"]), "shipment_cost_eur"].sum()
+    co2_saved = ((0.05 - 0.01) * num_incidents * filtered[filtered["exposure"] > 0]["unit_co2_emitted"].mean()) if num_incidents else 0.0
+    # Top markets by incident rate
+    market_rates = summary.sort_values("Pct Incidents", ascending=False)
+    top_markets = market_rates.head(3)
+    # Build report
+    report_lines = []
+    report_lines.append(f"Report for period: {date_range[0]} to {date_range[1]}")
+    report_lines.append(f"Total shipments: {total_records}")
+    report_lines.append(f"Incidents: {num_incidents} ({pct_incidents:.1f}%), Compliant: {pct_compliant:.1f}%")
+    report_lines.append(f"Total waste cost: €{waste_cost:.2f}")
+    report_lines.append(f"Estimated CO₂ saved: {co2_saved:.1f} kg")
+    report_lines.append("
+Top 3 markets by incident rate:")
+    for _, row in top_markets.iterrows():
+        report_lines.append(f"- {row['Market Label']}: {row['Pct Incidents']:.1f}% incidents")
+    report_text = "
+".join(report_lines)
+    # Display and download
+    st.text_area("Report Preview", report_text, height=200)
+    st.download_button("Download report.txt", report_text, file_name="market_report.txt")
