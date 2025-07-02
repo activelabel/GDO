@@ -234,7 +234,7 @@ if st.button("Generate Report"):
     # Top markets by incident rate
     market_rates = summary.sort_values("Pct Incidents", ascending=False)
     top_markets = market_rates.head(3)
-    # Build report
+    # Build report lines
     report_lines = []
     report_lines.append(f"Report for period: {date_range[0]} to {date_range[1]}")
     report_lines.append(f"Total shipments: {total_records}")
@@ -244,7 +244,7 @@ if st.button("Generate Report"):
     report_lines.append("Top 3 markets by incident rate:")
     for _, row in top_markets.iterrows():
         report_lines.append(f"- {row['Market Label']}: {row['Pct Incidents']:.1f}% incidents")
-    # Correctly join lines with newline
+    # Join lines with newline character
     report_text = "
 ".join(report_lines)
     # Display and download
