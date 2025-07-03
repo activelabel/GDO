@@ -257,7 +257,8 @@ col1, col2 = st.columns([1, 3])
 with col1:
     gen_ai = st.button("Generate AI Report")
 with col2:
-    temp_ai = st.slider("Creativity (temperature)", 0.0, 1.0, 0.3, 0.05)
+    # Only two options: 0 (deterministic) or 1 (creative)
+    temp_ai = st.radio("Creativity", [0.0, 1.0])
 
 if gen_ai:
     if filtered.empty:
