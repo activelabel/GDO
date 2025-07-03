@@ -246,30 +246,28 @@ def _draft_report(
     temperature: float = 0.3,
 ) -> str:
     """Constructs prompt and requests AI-generated text."""
-    # Prepare JSON-safe data sample
+    # Prepara sample_json (ciascuna riga come dict)
     sample_df = df.sample(min(len(df), 50), random_state=42).copy()
-    for col in sample_df.columns:
-        if pd.api.types.is_datetime64_any_dtype(sample_df[col]):
-            sample_df[col] = sample_df[col].astype(str)
-        elif pd.api.types.is_numeric_dtype(sample_df[col]):
-            sample_df[col] = sample_df[col].apply(lambda x: None if pd.isna(x) else float(x))
-        else:
-            sample_df[col] = sample_df[col].astype(str).fillna("N/A")
+    # … eventuale pulizia dei tipi …
     sample_json = sample_df.to_dict(orient="records")
-    # Build prompt with explicit newline escapes
-prompt = (
-    "You are a data analyst. Write a concise executive summary report in English (max 300 words), "
-    "highlighting KPIs, anomalies, and recommendations.\n\n"
-    f"Summary statistics: {json.dumps(_snapshot_stats(df))}\n\n"
-    f"Sample data rows: {json.dumps(sample_json)[:4000]}\n\n"
-    f"Additional request: {custom_task}"
-)
+
+    # === Qui sostituisci col nuovo prompt ===
+    prompt = (
+        "You are a data analyst. Write a concise executive summary report in English (max 300 words), "
+        "highlighting KPIs, anomalies, and recommendations.\n\n"
+        f"Summary statistics: {json.dumps(_snapshot_stats(df))}\n\n"
+        f"Sample data rows: {json.dumps(sample_json)[:4000]}\n\n"
+        f"Additional request: {custom_task}"
+    )
+
+    # Questa linea deve avere esattamente lo stesso livello di indentazione del prompt
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
         max_tokens=500,
     )
+
     return response.choices[0].message.content.strip()
 
 # -------------------- UI ------------------------
