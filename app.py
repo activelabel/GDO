@@ -241,3 +241,73 @@ if st.button("Generate Report"):
     # Display and download
     st.text_area("Report Preview", report_text, height=200)
     st.download_button("Download report.txt", report_text, file_name="market_report.txt")
+
+    # =================================================
+# === AI REPORT GENERATOR (REDESIGNED) ==========
+# =================================================
+
+def _snapshot_stats(df: pd.DataFrame) -> dict:
+    """Essential statistics for model input (reduces token cost)."""
+    total = len(df)
+    if total == 0:
+        return {}
+    num_inc = int((df["exposure"] > 0).sum())
+    num_comp = total - num_inc
+    compliance = float(round(num_comp / total * 100, 1))
+    incident = float(round(num_inc / total * 100, 1))
+    waste = float(round(df.loc[(df["exposure"] > 0) & (df["out_of_range"]), "shipment_cost_eur"].sum(), 2))
+    co2 = float(round((0.05 - 0.01) * num_inc * df["unit_co2_emitted"].mean(), 1))
+    return {
+        "total_shipments": total,
+        "compliance_pct": compliance,
+        "incident_pct": incident,
+        "waste_cost_eur": waste,
+        "co2_saved": co2,
+    }
+
+
+def _draft_report(df: pd.DataFrame, user_query: str, model: str = "gpt-4o", temperature: float = 0.3) -> str:
+    """Generate an AI-driven report based on the filtered data and user query."""
+    stats = _snapshot_stats(df)
+    # Build prompt dynamically
+    prompt = (
+        "You are a data analyst. Given the following dataset summary and a user question, provide a concise report.
+"
+        f"Dataset summary stats: {json.dumps(stats)}
+
+"
+        f"User question: {user_query}
+"
+        "Provide insights, key anomalies, and actionable recommendations based on the data."
+    )
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
+        max_tokens=500,
+    )
+    return response.choices[0].message.content.strip()
+
+# -------------------- UI ------------------------
+st.header("📝 AI-Powered Report")
+user_query = st.text_input("Enter your question or analysis request:", "")
+col1, col2 = st.columns([1,3])
+with col1:
+    gen_ai = st.button("Generate AI Report")
+with col2:
+    temp_ai = st.slider("Creativity (temperature)", 0.0, 1.0, 0.3, 0.05)
+
+if gen_ai:
+    if filtered.empty:
+        st.error("No data selected. Adjust filters to generate a report.")
+    else:
+        with st.spinner("Generating AI report..."):
+            ai_text = _draft_report(filtered, user_query, temperature=temp_ai)
+        st.markdown("### AI Report Preview")
+        st.write(ai_text)
+        st.download_button(
+            "Download AI Report",
+            ai_text,
+            file_name="ai_report.txt"
+        )
+
