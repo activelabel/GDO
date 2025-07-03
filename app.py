@@ -213,84 +213,46 @@ for city, labels in market_map.items():
 folium_static(tile_map)
 
 # ------------------------------------------------
+# QUICK REPORT
+# ------------------------------------------------
 st.header("📝 Quick Report")
 if st.button("Generate Report"):
-    # Basic summary
     total_records = len(filtered)
-    num_incidents = filtered[filtered["exposure"] > 0].shape[0]
+    num_incidents = (filtered["exposure"] > 0).sum()
     pct_incidents = num_incidents / total_records * 100 if total_records else 0.0
-    pct_compliant = 100 - pct_incidents
-    waste_cost = filtered.loc[(filtered["exposure"] > 0) & (filtered["out_of_range"]), "shipment_cost_eur"].sum()
-    co2_saved = ((0.05 - 0.01) * num_incidents * filtered[filtered["exposure"] > 0]["unit_co2_emitted"].mean()) if num_incidents else 0.0
-    # Top markets by incident rate
+    pct_compliant = 100.0 - pct_incidents
+    waste_cost = filtered.loc[
+        (filtered["exposure"] > 0) & (filtered["out_of_range"]), 
+        "shipment_cost_eur"
+    ].sum()
+    co2_saved = (
+        (0.05 - 0.01)
+        * num_incidents
+        * filtered.loc[filtered["exposure"] > 0, "unit_co2_emitted"].mean()
+        if num_incidents else 0.0
+    )
     market_rates = summary.sort_values("Pct Incidents", ascending=False)
     top_markets = market_rates.head(3)
-    # Build report lines
-    report_lines = []
-    report_lines.append(f"Report for period: {date_range[0]} to {date_range[1]}")
-    report_lines.append(f"Total shipments: {total_records}")
-    report_lines.append(f"Incidents: {num_incidents} ({pct_incidents:.1f}%), Compliant: {pct_compliant:.1f}%")
-    report_lines.append(f"Total waste cost: €{waste_cost:.2f}")
-    report_lines.append(f"Estimated CO₂ saved: {co2_saved:.1f} kg")
-    report_lines.append("Top 3 markets by incident rate:")
+
+    report_lines = [
+        f"Report for period: {date_range[0]} to {date_range[1]}",
+        f"Total shipments: {total_records}",
+        f"Incidents: {num_incidents} ({pct_incidents:.1f}%), Compliant: {pct_compliant:.1f}%",
+        f"Total waste cost: €{waste_cost:.2f}",
+        f"Estimated CO₂ saved: {co2_saved:.1f} kg",
+        "Top 3 markets by incident rate:",
+    ]
     for _, row in top_markets.iterrows():
         report_lines.append(f"- {row['Market Label']}: {row['Pct Incidents']:.1f}% incidents")
-    # Join lines with newline character
-        # Join lines with newline character
+
     report_text = "\n".join(report_lines)
-    # Display and download
     st.text_area("Report Preview", report_text, height=200)
     st.download_button("Download report.txt", report_text, file_name="market_report.txt")
 
-# =================================================
-# === AI REPORT GENERATOR (REDESIGNED) ==========
-# =================================================
-
-import json
-
-def _snapshot_stats(df: pd.DataFrame) -> dict:
-    """Compute essential stats for AI report."""
-    total = len(df)
-    if total == 0:
-        return {}
-    num_inc = int((df["exposure"] > 0).sum())
-    num_comp = total - num_inc
-    compliance_pct = round(num_comp / total * 100, 1)
-    incident_pct = round(num_inc / total * 100, 1)
-    waste_cost = round(df.loc[(df["exposure"] > 0) & (df["out_of_range"]), "shipment_cost_eur"].sum(), 2)
-    co2_saved = round((0.05 - 0.01) * num_inc * df["unit_co2_emitted"].mean(), 1)
-    return {
-        "total_shipments": float(total),
-        "compliance_pct": float(compliance_pct),
-        "incident_pct": float(incident_pct),
-        "waste_cost_eur": float(waste_cost),
-        "co2_saved": float(co2_saved),
-    }
-
-def _draft_report(
-    df: pd.DataFrame,
-    user_query: str,
-    model: str = "gpt-4o",
-    temperature: float = 0.3,
-) -> str:
-    """Generate an AI-driven report based on filtered data and a user question."""
-    stats = _snapshot_stats(df)
-    prompt = (
-        "You are a data analyst. Given the following dataset summary and a user question, provide a concise report.\n\n"
-        f"Dataset summary stats: {json.dumps(stats)}\n\n"
-        f"User question: {user_query}\n\n"
-        "Provide insights, key anomalies, and actionable recommendations based on the data."
-    )
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-        max_tokens=500,
-    )
-    return response.choices[0].message.content.strip()
-
-# -------------------- UI ------------------------
-st.header("📝 AI-Powered Custom Report")
+# ------------------------------------------------
+# AI QUERY INTERFACE
+# ------------------------------------------------
+st.header("🔍 Ask a Question")
 user_query = st.text_input("Enter your analysis question or insight request:", "")
 
 col1, col2 = st.columns([1, 3])
@@ -300,7 +262,9 @@ with col2:
     temp_ai = st.slider("Creativity (temperature)", 0.0, 1.0, 0.3, 0.05)
 
 if gen_ai:
-    if filtered.empty:
+    if not user_query:
+        st.error("Please enter a question before generating the AI report.")
+    elif filtered.empty:
         st.error("No data selected. Please adjust your filters first.")
     else:
         with st.spinner("Generating AI report..."):
