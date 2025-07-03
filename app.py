@@ -257,19 +257,13 @@ def _draft_report(
             sample_df[col] = sample_df[col].astype(str).fillna("N/A")
     sample_json = sample_df.to_dict(orient="records")
     # Build prompt with explicit newline escapes
-    prompt = (
-        "You are a data analyst. Write a concise executive summary report in English (max 300 words), "
-        "highlighting KPIs, anomalies, and recommendations.
-
-"
-        f"Summary statistics: {json.dumps(_snapshot_stats(df))}
-
-"
-        f"Sample data rows: {json.dumps(sample_json)[:4000]}
-
-"
-        f"Additional request: {custom_task}"
-    )
+prompt = (
+    "You are a data analyst. Write a concise executive summary report in English (max 300 words), "
+    "highlighting KPIs, anomalies, and recommendations.\n\n"
+    f"Summary statistics: {json.dumps(_snapshot_stats(df))}\n\n"
+    f"Sample data rows: {json.dumps(sample_json)[:4000]}\n\n"
+    f"Additional request: {custom_task}"
+)
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
