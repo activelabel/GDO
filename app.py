@@ -220,11 +220,26 @@ def _snapshot_stats(df: pd.DataFrame) -> dict:
     """Essential statistics for model input (reduces token cost)."""
     if df.empty:
         return {}
+    # Calculate stats and cast to native Python types for JSON serialization
+    compliance = df["in_range"].mean() * 100
+    incident = df["out_of_range"].mean() * 100
+    waste = df.loc[df["out_of_range"], "shipment_cost_eur"].sum()
+    co2 = (0.05 - 0.01) * len(df) * df["unit_co2_emitted"].mean()
     return {
-        "compliance_pct": round(df["in_range"].mean() * 100, 1),
-        "incident_pct": round(df["out_of_range"].mean() * 100, 1),
-        "waste_cost_eur": round(df.loc[df["out_of_range"], "shipment_cost_eur"].sum(), 2),
-        "co2_saved": round((0.05 - 0.01) * len(df) * df["unit_co2_emitted"].mean(), 1),
+        "compliance_pct": float(round(compliance, 1)),
+        "incident_pct": float(round(incident, 1)),
+        "waste_cost_eur": float(round(waste, 2)),
+        "co2_saved": float(round(co2, 1)),
+    }
+    return {
+        "compliance_pct": float(round(df["in_range"].mean() * 100, 1)),
+        "incident_pct": float(round(df["out_of_range"].mean() * 100, 1)),
+        "waste_cost_eur": float(round(
+            df.loc[df["out_of_range"], "shipment_cost_eur"].sum(), 2
+        )),
+        "co2_saved": float(round(
+            (0.05 - 0.01) * len(df) * df["unit_co2_emitted"].mean(), 1
+        )),
     }
 
 
@@ -235,7 +250,7 @@ def _draft_report(
     temperature: float = 0.3,
 ) -> str:
     """Constructs prompt and requests AI-generated text."""
-    # Prepare a JSON-safe sample
+    # Prepare JSON-safe data sample
     sample_df = df.sample(min(len(df), 50), random_state=42).copy()
     for col in sample_df.columns:
         if pd.api.types.is_datetime64_any_dtype(sample_df[col]):
@@ -246,19 +261,22 @@ def _draft_report(
             sample_df[col] = sample_df[col].astype(str).fillna("N/A")
     sample_json = sample_df.to_dict(orient="records")
 
-    # Build prompt
+        # Build prompt
     prompt = (
         "You are a data analyst. Write a concise executive summary report in English (max 300 words), "
-        "highlighting KPIs, anomalies, and recommendations.\n\n"
-        f"Summary statistics: {json.dumps(_snapshot_stats(df))}\n\n"
-        f"Sample data rows: {json.dumps(sample_json)[:4000]}\n\n"
+        "highlighting KPIs, anomalies, and recommendations.
+
+"
+        f"Summary statistics: {json.dumps(_snapshot_stats(df))}
+
+"
+        f"Sample data rows: {json.dumps(sample_json)[:4000]}
+
+"
         f"Additional request: {custom_task}"
-)
+    )
 
-
-
-
-    # Call the OpenAI API
+    # Call OpenAI
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
@@ -266,7 +284,6 @@ def _draft_report(
         max_tokens=500,
     )
     return response.choices[0].message.content.strip()
-
 
 # -------------------- UI ------------------------
 col_analysis, col_download = st.columns(2)
