@@ -245,6 +245,7 @@ if st.button("Generate Report"):
     for _, row in top_markets.iterrows():
         report_lines.append(f"- {row['Market Label']}: {row['Pct Incidents']:.1f}% incidents")
     # Join lines with newline character
+            # Join lines with newline character
     report_text = "
 ".join(report_lines)
     # Display and download
