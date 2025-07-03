@@ -261,20 +261,17 @@ def _draft_report(
             sample_df[col] = sample_df[col].astype(str).fillna("N/A")
     sample_json = sample_df.to_dict(orient="records")
 
-        # Build prompt
+    # Build prompt without line break literals
+    stats_json = json.dumps(_snapshot_stats(df))
+    rows_json = json.dumps(sample_json)[:4000]
     prompt = (
         "You are a data analyst. Write a concise executive summary report in English (max 300 words), "
-        "highlighting KPIs, anomalies, and recommendations.
-
-"
-        f"Summary statistics: {json.dumps(_snapshot_stats(df))}
-
-"
-        f"Sample data rows: {json.dumps(sample_json)[:4000]}
-
-"
+        "highlighting KPIs, anomalies, and recommendations.\n\n"
+        f"Summary statistics: {stats_json}\n\n"
+        f"Sample data rows: {rows_json}\n\n"
         f"Additional request: {custom_task}"
-    )
+)
+
 
     # Call OpenAI
     response = client.chat.completions.create(
