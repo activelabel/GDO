@@ -249,12 +249,10 @@ if st.button("Generate Report"):
     st.text_area("Report Preview", report_text, height=200)
     st.download_button("Download report.txt", report_text, file_name="market_report.txt")
 
-# ------------------------------------------------
-# AI QUERY INTERFACE
-# ------------------------------------------------
-st.header("🔍 Ask a Question")
-user_query = st.text_input("Enter your analysis question or insight request:", "")
 
+# ------------------------------------------------
+# AI-Powered Custom Report
+# ------------------------------------------------
 col1, col2 = st.columns([1, 3])
 with col1:
     gen_ai = st.button("Generate AI Report")
@@ -262,13 +260,11 @@ with col2:
     temp_ai = st.slider("Creativity (temperature)", 0.0, 1.0, 0.3, 0.05)
 
 if gen_ai:
-    if not user_query:
-        st.error("Please enter a question before generating the AI report.")
-    elif filtered.empty:
+    if filtered.empty:
         st.error("No data selected. Please adjust your filters first.")
     else:
         with st.spinner("Generating AI report..."):
-            ai_text = _draft_report(filtered, user_query, temperature=temp_ai)
+            ai_text = _draft_report(filtered, "", temperature=temp_ai)
         st.markdown("### AI Report Preview")
         st.write(ai_text)
         st.download_button(
