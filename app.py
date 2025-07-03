@@ -246,38 +246,40 @@ if st.button("Generate Report"):
 # === AI REPORT GENERATOR (REDESIGNED) ==========
 # =================================================
 
+import json
+
 def _snapshot_stats(df: pd.DataFrame) -> dict:
-    """Essential statistics for model input (reduces token cost)."""
+    """Compute essential stats for AI report."""
     total = len(df)
     if total == 0:
         return {}
     num_inc = int((df["exposure"] > 0).sum())
     num_comp = total - num_inc
-    compliance = float(round(num_comp / total * 100, 1))
-    incident = float(round(num_inc / total * 100, 1))
-    waste = float(round(df.loc[(df["exposure"] > 0) & (df["out_of_range"]), "shipment_cost_eur"].sum(), 2))
-    co2 = float(round((0.05 - 0.01) * num_inc * df["unit_co2_emitted"].mean(), 1))
+    compliance_pct = round(num_comp / total * 100, 1)
+    incident_pct = round(num_inc / total * 100, 1)
+    waste_cost = round(df.loc[(df["exposure"] > 0) & (df["out_of_range"]), "shipment_cost_eur"].sum(), 2)
+    co2_saved = round((0.05 - 0.01) * num_inc * df["unit_co2_emitted"].mean(), 1)
     return {
         "total_shipments": total,
-        "compliance_pct": compliance,
-        "incident_pct": incident,
-        "waste_cost_eur": waste,
-        "co2_saved": co2,
+        "compliance_pct": float(compliance_pct),
+        "incident_pct": float(incident_pct),
+        "waste_cost_eur": float(waste_cost),
+        "co2_saved": float(co2_saved),
     }
 
-
-def _draft_report(df: pd.DataFrame, user_query: str, model: str = "gpt-4o", temperature: float = 0.3) -> str:
-    """Generate an AI-driven report based on the filtered data and user query."""
+def _draft_report(
+    df: pd.DataFrame,
+    user_query: str,
+    model: str = "gpt-4o",
+    temperature: float = 0.3,
+) -> str:
+    """Generate an AI-driven report based on filtered data and a user question."""
     stats = _snapshot_stats(df)
-    # Build prompt dynamically
+    # Build prompt
     prompt = (
-        "You are a data analyst. Given the following dataset summary and a user question, provide a concise report.
-"
-        f"Dataset summary stats: {json.dumps(stats)}
-
-"
-        f"User question: {user_query}
-"
+        "You are a data analyst. Given the following dataset summary and a user question, provide a concise report.\n\n"
+        f"Dataset summary stats: {json.dumps(stats)}\n\n"
+        f"User question: {user_query}\n\n"
         "Provide insights, key anomalies, and actionable recommendations based on the data."
     )
     response = client.chat.completions.create(
@@ -289,25 +291,10 @@ def _draft_report(df: pd.DataFrame, user_query: str, model: str = "gpt-4o", temp
     return response.choices[0].message.content.strip()
 
 # -------------------- UI ------------------------
-st.header("📝 AI-Powered Report")
-user_query = st.text_input("Enter your question or analysis request:", "")
-col1, col2 = st.columns([1,3])
+st.header("📝 AI-Powered Custom Report")
+user_query = st.text_input("Enter your analysis question or insight request:", "")
+col1, col2 = st.columns([1, 3])
 with col1:
     gen_ai = st.button("Generate AI Report")
 with col2:
-    temp_ai = st.slider("Creativity (temperature)", 0.0, 1.0, 0.3, 0.05)
-
-if gen_ai:
-    if filtered.empty:
-        st.error("No data selected. Adjust filters to generate a report.")
-    else:
-        with st.spinner("Generating AI report..."):
-            ai_text = _draft_report(filtered, user_query, temperature=temp_ai)
-        st.markdown("### AI Report Preview")
-        st.write(ai_text)
-        st.download_button(
-            "Download AI Report",
-            ai_text,
-            file_name="ai_report.txt"
-        )
-
+    temp_ai = st.slider("Cre_
