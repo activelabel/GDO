@@ -221,14 +221,10 @@ def _snapshot_stats(df: pd.DataFrame) -> dict:
     if df.empty:
         return {}
     return {
-        "compliance_pct": float(round(df["in_range"].mean() * 100, 1)),
-        "incident_pct": float(round(df["out_of_range"].mean() * 100, 1)),
-        "waste_cost_eur": float(round(
-            df.loc[df["out_of_range"], "shipment_cost_eur"].sum(), 2
-        )),
-        "co2_saved": float(round(
-            (0.05 - 0.01) * len(df) * df["unit_co2_emitted"].mean(), 1
-        )),
+        "compliance_pct": round(df["in_range"].mean() * 100, 1),
+        "incident_pct": round(df["out_of_range"].mean() * 100, 1),
+        "waste_cost_eur": round(df.loc[df["out_of_range"], "shipment_cost_eur"].sum(), 2),
+        "co2_saved": round((0.05 - 0.01) * len(df) * df["unit_co2_emitted"].mean(), 1),
     }
 
 
@@ -239,18 +235,8 @@ def _draft_report(
     temperature: float = 0.3,
 ) -> str:
     """Constructs prompt and requests AI-generated text."""
-    # Prepare JSON-safe data sample
+    # Prepare a JSON-safe sample
     sample_df = df.sample(min(len(df), 50), random_state=42).copy()
-    # Convert datetimes and numerics to JSON-serializable types
-    for col in sample_df.columns:
-        if pd.api.types.is_datetime64_any_dtype(sample_df[col]):
-            sample_df[col] = sample_df[col].astype(str)
-        elif pd.api.types.is_numeric_dtype(sample_df[col]):
-            sample_df[col] = sample_df[col].apply(lambda x: None if pd.isna(x) else float(x))
-        else:
-            sample_df[col] = sample_df[col].astype(str).fillna("N/A")
-    # Convert to records
-    sample_json = sample_df.to_dict(orient="records")(len(df), 50), random_state=42).copy()
     for col in sample_df.columns:
         if pd.api.types.is_datetime64_any_dtype(sample_df[col]):
             sample_df[col] = sample_df[col].astype(str)
@@ -259,21 +245,25 @@ def _draft_report(
         else:
             sample_df[col] = sample_df[col].astype(str).fillna("N/A")
     sample_json = sample_df.to_dict(orient="records")
-    # Build prompt with explicit newline escapes
+
+    # Build the prompt
     prompt = (
         "You are a data analyst. Write a concise executive summary report in English (max 300 words), "
-        "highlighting KPIs, anomalies, and recommendations.
-
-"
-        f"Summary statistics: {json.dumps(_snapshot_stats(df))}
-
-"
-        f"Sample data rows: {json.dumps(sample_json)[:4000]}
-
-"
+        "highlighting KPIs, anomalies, and recommendations.\n\n"
+        f"Summary statistics: {json.dumps(_snapshot_stats(df))}\n\n"
+        f"Sample data rows: {json.dumps(sample_json)[:4000]}\n\n"
         f"Additional request: {custom_task}"
     )
-    response = client.chat.completions.create([0].message.content.strip()
+
+    # Call the OpenAI API
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
+        max_tokens=500,
+    )
+    return response.choices[0].message.content.strip()
+
 
 # -------------------- UI ------------------------
 col_analysis, col_download = st.columns(2)
@@ -290,6 +280,7 @@ with col_analysis:
             gen_btn = st.button("Generate report")
         with right:
             temp_val = st.slider("Creativity (temperature)", 0.0, 1.0, 0.3, 0.05)
+
         if gen_btn:
             if filtered.empty:
                 st.error("No filtered data – adjust the filters and try again.")
