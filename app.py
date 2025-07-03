@@ -242,7 +242,7 @@ if st.button("Generate Report"):
     st.text_area("Report Preview", report_text, height=200)
     st.download_button("Download report.txt", report_text, file_name="market_report.txt")
 
-    # =================================================
+# =================================================
 # === AI REPORT GENERATOR (REDESIGNED) ==========
 # =================================================
 
@@ -260,7 +260,7 @@ def _snapshot_stats(df: pd.DataFrame) -> dict:
     waste_cost = round(df.loc[(df["exposure"] > 0) & (df["out_of_range"]), "shipment_cost_eur"].sum(), 2)
     co2_saved = round((0.05 - 0.01) * num_inc * df["unit_co2_emitted"].mean(), 1)
     return {
-        "total_shipments": total,
+        "total_shipments": float(total),
         "compliance_pct": float(compliance_pct),
         "incident_pct": float(incident_pct),
         "waste_cost_eur": float(waste_cost),
@@ -275,7 +275,6 @@ def _draft_report(
 ) -> str:
     """Generate an AI-driven report based on filtered data and a user question."""
     stats = _snapshot_stats(df)
-    # Build prompt
     prompt = (
         "You are a data analyst. Given the following dataset summary and a user question, provide a concise report.\n\n"
         f"Dataset summary stats: {json.dumps(stats)}\n\n"
@@ -293,8 +292,23 @@ def _draft_report(
 # -------------------- UI ------------------------
 st.header("📝 AI-Powered Custom Report")
 user_query = st.text_input("Enter your analysis question or insight request:", "")
+
 col1, col2 = st.columns([1, 3])
 with col1:
     gen_ai = st.button("Generate AI Report")
 with col2:
-    temp_ai = st.slider("Cre_
+    temp_ai = st.slider("Creativity (temperature)", 0.0, 1.0, 0.3, 0.05)
+
+if gen_ai:
+    if filtered.empty:
+        st.error("No data selected. Please adjust your filters first.")
+    else:
+        with st.spinner("Generating AI report..."):
+            ai_text = _draft_report(filtered, user_query, temperature=temp_ai)
+        st.markdown("### AI Report Preview")
+        st.write(ai_text)
+        st.download_button(
+            "Download AI Report",
+            ai_text,
+            file_name="ai_custom_report.txt"
+        )
