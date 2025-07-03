@@ -256,6 +256,7 @@ def _draft_report(
         else:
             sample_df[col] = sample_df[col].astype(str).fillna("N/A")
     sample_json = sample_df.to_dict(orient="records")
+    # Build prompt with explicit newline escapes
     prompt = (
         "You are a data analyst. Write a concise executive summary report in English (max 300 words), "
         "highlighting KPIs, anomalies, and recommendations.
