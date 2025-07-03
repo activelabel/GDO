@@ -212,111 +212,32 @@ for city, labels in market_map.items():
         ).add_to(tile_map)
 folium_static(tile_map)
 
-# =================================================
-# === AI REPORT GENERATOR  (NEW SECTION) ==========
-# =================================================
-
-def _snapshot_stats(df: pd.DataFrame) -> dict:
-    """Essential statistics for model input (reduces token cost)."""
-    if df.empty:
-        return {}
-    # Calculate stats and cast to native Python types for JSON serialization
-    compliance = df["in_range"].mean() * 100
-    incident = df["out_of_range"].mean() * 100
-    waste = df.loc[df["out_of_range"], "shipment_cost_eur"].sum()
-    co2 = (0.05 - 0.01) * len(df) * df["unit_co2_emitted"].mean()
-    return {
-        "compliance_pct": float(round(compliance, 1)),
-        "incident_pct": float(round(incident, 1)),
-        "waste_cost_eur": float(round(waste, 2)),
-        "co2_saved": float(round(co2, 1)),
-    }
-    return {
-        "compliance_pct": float(round(df["in_range"].mean() * 100, 1)),
-        "incident_pct": float(round(df["out_of_range"].mean() * 100, 1)),
-        "waste_cost_eur": float(round(
-            df.loc[df["out_of_range"], "shipment_cost_eur"].sum(), 2
-        )),
-        "co2_saved": float(round(
-            (0.05 - 0.01) * len(df) * df["unit_co2_emitted"].mean(), 1
-        )),
-    }
-
-
-def _draft_report(
-    df: pd.DataFrame,
-    custom_task: str,
-    model: str = "gpt-4o",
-    temperature: float = 0.3,
-) -> str:
-    """Constructs prompt and requests AI-generated text."""
-    # Prepare JSON-safe data sample
-    sample_df = df.sample(min(len(df), 50), random_state=42).copy()
-    for col in sample_df.columns:
-        if pd.api.types.is_datetime64_any_dtype(sample_df[col]):
-            sample_df[col] = sample_df[col].astype(str)
-        elif pd.api.types.is_numeric_dtype(sample_df[col]):
-            sample_df[col] = sample_df[col].apply(lambda x: None if pd.isna(x) else float(x))
-        else:
-            sample_df[col] = sample_df[col].astype(str).fillna("N/A")
-    sample_json = sample_df.to_dict(orient="records")
-
-    # Build prompt without line break literals
-    stats_json = json.dumps(_snapshot_stats(df))
-    rows_json = json.dumps(sample_json)[:4000]
-    prompt = (
-        "You are a data analyst. Write a concise executive summary report in English (max 300 words), "
-        "highlighting KPIs, anomalies, and recommendations.\n\n"
-        f"Summary statistics: {stats_json}\n\n"
-        f"Sample data rows: {rows_json}\n\n"
-        f"Additional request: {custom_task}"
-)
-
-
-    # Call OpenAI
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-        max_tokens=500,
-    )
-    return response.choices[0].message.content.strip()
-
-# -------------------- UI ------------------------
-col_analysis, col_download = st.columns(2)
-
-with col_analysis:
-    st.header("📝 AI Analysis")
-    with st.expander("Generate a mini-report for filtered data"):
-        task_txt = st.text_area(
-            "Additional instructions (optional)",
-            "Example: Highlight operators with the most incidents and suggest actions.",
-        )
-        left, right = st.columns([1, 4])
-        with left:
-            gen_btn = st.button("Generate report")
-        with right:
-            temp_val = st.slider("Creativity (temperature)", 0.0, 1.0, 0.3, 0.05)
-
-        if gen_btn:
-            if filtered.empty:
-                st.error("No filtered data – adjust the filters and try again.")
-            elif not client.api_key:
-                st.error("OPENAI_API_KEY not configured.")
-            else:
-                with st.spinner("AI analysis in progress..."):
-                    report_txt = _draft_report(filtered, task_txt, temperature=temp_val)
-                st.success("Report is ready:")
-                st.markdown("### Preview")
-                st.write(report_txt)
-                st.download_button(
-                    "Download report.txt", report_txt, file_name="mini_report.txt"
-                )
-
-with col_download:
-    st.header("📥 Download Data")
-    st.download_button(
-        "Export CSV",
-        filtered.to_csv(index=False).encode("utf-8"),
-        file_name="report_active_label.csv",
-    )
+# ------------------------------------------------
+st.header("📝 Quick Report")
+if st.button("Generate Report"):
+    # Basic summary
+    total_records = len(filtered)
+    num_incidents = filtered[filtered["exposure"] > 0].shape[0]
+    pct_incidents = num_incidents / total_records * 100 if total_records else 0.0
+    pct_compliant = 100 - pct_incidents
+    waste_cost = filtered.loc[(filtered["exposure"] > 0) & (filtered["out_of_range"]), "shipment_cost_eur"].sum()
+    co2_saved = ((0.05 - 0.01) * num_incidents * filtered[filtered["exposure"] > 0]["unit_co2_emitted"].mean()) if num_incidents else 0.0
+    # Top markets by incident rate
+    market_rates = summary.sort_values("Pct Incidents", ascending=False)
+    top_markets = market_rates.head(3)
+    # Build report lines
+    report_lines = []
+    report_lines.append(f"Report for period: {date_range[0]} to {date_range[1]}")
+    report_lines.append(f"Total shipments: {total_records}")
+    report_lines.append(f"Incidents: {num_incidents} ({pct_incidents:.1f}%), Compliant: {pct_compliant:.1f}%")
+    report_lines.append(f"Total waste cost: €{waste_cost:.2f}")
+    report_lines.append(f"Estimated CO₂ saved: {co2_saved:.1f} kg")
+    report_lines.append("Top 3 markets by incident rate:")
+    for _, row in top_markets.iterrows():
+        report_lines.append(f"- {row['Market Label']}: {row['Pct Incidents']:.1f}% incidents")
+    # Join lines with newline character
+        # Join lines with newline character
+    report_text = "\n".join(report_lines)
+    # Display and download
+    st.text_area("Report Preview", report_text, height=200)
+    st.download_button("Download report.txt", report_text, file_name="market_report.txt")
