@@ -178,20 +178,16 @@ st.dataframe(summary, use_container_width=True)
 # MAPPA MERCATI
 # ------------------------------------------------
 st.subheader("🗺️ Market Locations")
-# Base coordinates for each city center
 city_coords = {
     "Rome": (41.9028, 12.4964),
     "Florence": (43.7696, 11.2558),
     "Turin": (45.0703, 7.6869)
 }
-# Initialize folium map centered in Italy
 tile_map = folium.Map(location=[42.5, 12.5], zoom_start=5)
-# Determine market labels for each city
 market_map = {}
 for label in filtered["Market Label"].unique():
     city = label.split()[-1]
     market_map.setdefault(city, []).append(label)
-# Place a marker for each market with color reflecting % Incidents
 for city, labels in market_map.items():
     if city not in city_coords:
         continue
@@ -199,12 +195,10 @@ for city, labels in market_map.items():
     n = len(labels)
     for i, label in enumerate(labels):
         angle = 2 * np.pi * i / max(n, 1)
-        r = 0.05  # offset radius in degrees (~5 km)
+        r = 0.05
         lat = base_lat + r * np.sin(angle)
         lon = base_lon + r * np.cos(angle)
-        # Look up % incidents in summary
         pct_label = float(summary.loc[summary["Market Label"] == label, "Pct Incidents"])
-        # Determine marker color
         if pct_label < 2:
             color = 'green'
         elif pct_label > 15:
@@ -216,7 +210,6 @@ for city, labels in market_map.items():
             popup=f"{label}: {pct_label:.1f}% incidents",
             icon=folium.Icon(color=color, icon='info-sign')
         ).add_to(tile_map)
-# Render the map
 folium_static(tile_map)
 
 # =================================================
@@ -246,29 +239,41 @@ def _draft_report(
     temperature: float = 0.3,
 ) -> str:
     """Constructs prompt and requests AI-generated text."""
-    # Prepara sample_json (ciascuna riga come dict)
+    # Prepare JSON-safe data sample
     sample_df = df.sample(min(len(df), 50), random_state=42).copy()
-    # … eventuale pulizia dei tipi …
+    # Convert datetimes and numerics to JSON-serializable types
+    for col in sample_df.columns:
+        if pd.api.types.is_datetime64_any_dtype(sample_df[col]):
+            sample_df[col] = sample_df[col].astype(str)
+        elif pd.api.types.is_numeric_dtype(sample_df[col]):
+            sample_df[col] = sample_df[col].apply(lambda x: None if pd.isna(x) else float(x))
+        else:
+            sample_df[col] = sample_df[col].astype(str).fillna("N/A")
+    # Convert to records
+    sample_json = sample_df.to_dict(orient="records")(len(df), 50), random_state=42).copy()
+    for col in sample_df.columns:
+        if pd.api.types.is_datetime64_any_dtype(sample_df[col]):
+            sample_df[col] = sample_df[col].astype(str)
+        elif pd.api.types.is_numeric_dtype(sample_df[col]):
+            sample_df[col] = sample_df[col].apply(lambda x: None if pd.isna(x) else float(x))
+        else:
+            sample_df[col] = sample_df[col].astype(str).fillna("N/A")
     sample_json = sample_df.to_dict(orient="records")
-
-    # === Qui sostituisci col nuovo prompt ===
+    # Build prompt with explicit newline escapes
     prompt = (
         "You are a data analyst. Write a concise executive summary report in English (max 300 words), "
-        "highlighting KPIs, anomalies, and recommendations.\n\n"
-        f"Summary statistics: {json.dumps(_snapshot_stats(df))}\n\n"
-        f"Sample data rows: {json.dumps(sample_json)[:4000]}\n\n"
+        "highlighting KPIs, anomalies, and recommendations.
+
+"
+        f"Summary statistics: {json.dumps(_snapshot_stats(df))}
+
+"
+        f"Sample data rows: {json.dumps(sample_json)[:4000]}
+
+"
         f"Additional request: {custom_task}"
     )
-
-    # Questa linea deve avere esattamente lo stesso livello di indentazione del prompt
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-        max_tokens=500,
-    )
-
-    return response.choices[0].message.content.strip()
+    response = client.chat.completions.create([0].message.content.strip()
 
 # -------------------- UI ------------------------
 col_analysis, col_download = st.columns(2)
